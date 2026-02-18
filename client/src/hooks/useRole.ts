@@ -16,7 +16,7 @@ export function useRole() {
     const role = profile?.role || (isAdminEmail ? "ADMIN" : "MEMBER");
 
     // Consideramos carregando apenas se o Clerk não carregou OU 
-    // se o perfil não existe E a query ainda está rodando
+    // se o perfil não existe E a query ainda está rodando, mas com um limite
     const isLoading = !isLoaded || (isQueryLoading && !profile && !isAdminEmail);
 
     if (isLoaded) {
@@ -26,7 +26,8 @@ export function useRole() {
             hasProfile: !!profile,
             isAdminEmail,
             finalIsLoading: isLoading,
-            finalRole: role
+            finalRole: role,
+            userId: user?.id
         });
     }
 

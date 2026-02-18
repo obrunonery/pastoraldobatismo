@@ -58,13 +58,12 @@ function TRPCProvider({ children }: { children: React.ReactNode }) {
     const { getToken } = useAuth();
 
     const trpcClient = useMemo(() => trpc.createClient({
-        transformer: superjson,
         links: [
             httpBatchLink({
                 url: "/api/trpc",
+                transformer: superjson as any,
                 async headers() {
                     const token = await getToken();
-                    console.log("[TRPC] Sending token:", !!token);
                     return {
                         Authorization: token ? `Bearer ${token}` : undefined,
                     };
@@ -81,7 +80,10 @@ function TRPCProvider({ children }: { children: React.ReactNode }) {
 }
 
 createRoot(document.getElementById("root")!).render(
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} afterSignOutUrl="/">
+    <ClerkProvider
+        publishableKey={CLERK_PUBLISHABLE_KEY}
+        afterSignOutUrl="/"
+    >
         <TRPCProvider>
             <QueryClientProvider client={queryClient}>
                 <App />

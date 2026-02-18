@@ -1,153 +1,179 @@
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Calendar as CalendarIcon, ChevronLeft, ChevronRight, MapPin, Clock as ClockIcon, Users } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from 'react';
+import { Calendar } from "@/components/ui/calendar";
+import { PencilIcon, TrashIcon, MapPinIcon, CalendarIcon, User, MoreHorizontal, Ban } from 'lucide-react';
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { trpc } from "@/lib/trpc";
 import { useRole } from "@/hooks/useRole";
-import { formatDate, formatMonthYear } from "@/lib/date-utils";
+import { Button } from "@/components/ui/button";
+import { AgendaFormModal } from "@/components/AgendaFormModal";
+import { toast } from "sonner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-const eventTypeColors = {
-    baptism: "bg-blue-100 text-blue-800 border-blue-200",
-    meeting: "bg-purple-100 text-purple-800 border-purple-200",
-    gathering: "bg-green-100 text-green-800 border-green-200",
-};
+export default function AgendaPage() {
+    const { isAdmin, isSecretary } = useRole();
+    const [date, setDate] = useState<Date | undefined>(new Date());
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedEvent, setSelectedEvent] = useState<any>(null);
+    const utils = trpc.useUtils();
 
-const eventTypeLabels = {
-    baptism: "🍼 Batismo",
-    meeting: "📝 Reunião",
-    gathering: "🎉 Encontro",
-};
-
-export default function Agenda() {
-    const [selectedMonth, setSelectedMonth] = useState(new Date());
-    const { isSecretary } = useRole();
     const { data: eventsResponse, isLoading } = trpc.agenda.list.useQuery();
     const events = Array.isArray(eventsResponse) ? eventsResponse : [];
 
-    const eventsByMonth = events.filter(event => {
-        const dateStr = (event as any).eventDate || (event as any).date;
-        if (!dateStr) return false;
-        const eventDate = new Date(dateStr);
-        return eventDate.getMonth() === selectedMonth.getMonth() &&
-            eventDate.getFullYear() === selectedMonth.getFullYear();
+    const updateMutation = trpc.agenda.update.useMutation({
+        onSuccess: () => {
+            toast.success("Operação concluída!");
+            utils.agenda.list.invalidate();
+            setModalOpen(false);
+            setSelectedEvent(null);
+        }
     });
 
-    const changeMonth = (offset: number) => {
-        const next = new Date(selectedMonth);
-        next.setMonth(next.getMonth() + offset);
-        setSelectedMonth(next);
+    const createMutation = trpc.agenda.create.useMutation({
+        onSuccess: () => {
+            toast.success("Evento agendado!");
+            utils.agenda.list.invalidate();
+            setModalOpen(false);
+        }
+    });
+
+    const handleEdit = (event: any) => {
+        setSelectedEvent(event);
+        setModalOpen(true);
     };
 
+    const handleCancel = async (id: number) => {
+        if (confirm("Deseja marcar este evento como cancelado?")) {
+            await updateMutation.mutateAsync({ id, status: "Cancelado" });
+        }
+    };
+
+    const filteredEvents = date
+        ? events.filter((e: any) => {
+            const eventDate = new Date(e.date);
+            return eventDate.getDate() === date.getDate() &&
+                eventDate.getMonth() === date.getMonth() &&
+                eventDate.getFullYear() === date.getFullYear();
+        })
+        : [];
+
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Agenda</h1>
-                    <p className="text-slate-600 mt-1">Planejamento mensal da pastoral</p>
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-16 p-8 bg-white min-h-screen animate-in fade-in duration-500">
+
+            {/* 1. Coluna da Esquerda: Compromissos */}
+            <div className="flex-1 max-w-3xl">
+                <div className="flex items-center justify-between mb-12 border-b border-slate-50 pb-8">
+                    <h2 className="text-xl font-bold text-slate-900 tracking-tight">Compromissos Pastoral</h2>
                 </div>
-                {isSecretary && (
-                    <Button className="gap-2 bg-stats-cyan hover:bg-stats-cyan/90">
-                        <Plus size={18} />
-                        Novo Evento
-                    </Button>
-                )}
-            </div>
 
-            {isLoading && (
-                <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stats-cyan"></div>
-                </div>
-            )}
-
-            <Card className="border-none shadow-md overflow-hidden">
-                <CardHeader className="bg-white border-b border-gray-100">
-                    <CardTitle className="text-lg flex items-center justify-between">
-                        <span className="capitalize font-bold text-gray-700">{formatMonthYear(selectedMonth)}</span>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => changeMonth(-1)} className="rounded-lg">
-                                <ChevronLeft size={16} />
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => setSelectedMonth(new Date())} className="text-xs font-bold">
-                                HOJE
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => changeMonth(1)} className="rounded-lg">
-                                <ChevronRight size={16} />
-                            </Button>
-                        </div>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <div className="divide-y divide-gray-100">
-                        {eventsByMonth.length > 0 ? (
-                            eventsByMonth.map((event) => (
-                                <div key={event.id} className="p-6 hover:bg-gray-50/80 transition-all flex gap-6 items-start">
-                                    <div className="flex flex-col items-center justify-center bg-white border border-gray-100 shadow-sm rounded-xl p-3 min-w-[70px]">
-                                        <span className="text-xs font-bold text-stats-pink uppercase tracking-tighter">
-                                            {formatDate((event as any).eventDate || (event as any).date, "EEE")}
-                                        </span>
-                                        <span className="text-2xl font-black text-gray-800">
-                                            {formatDate((event as any).eventDate || (event as any).date, "dd")}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex-1 space-y-3">
-                                        <div className="flex items-center gap-2">
-                                            <Badge className={cn("border", eventTypeColors[((event as any).eventType || "baptism") as keyof typeof eventTypeColors])}>
-                                                {eventTypeLabels[((event as any).eventType || "baptism") as keyof typeof eventTypeLabels]}
-                                            </Badge>
-                                            {(event as any).eventTime && (
-                                                <div className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase">
-                                                    <ClockIcon size={12} />
-                                                    {event.eventTime}
-                                                </div>
-                                            )}
+                <div className="space-y-0">
+                    {date ? (
+                        filteredEvents.length > 0 ? (
+                            filteredEvents.map((event: any) => (
+                                <div key={event.id} className={cn(
+                                    "group flex items-center justify-between py-6 border-b border-slate-50 hover:bg-slate-50/40 transition-all px-4 -mx-4 rounded-3xl",
+                                    event.status === "Cancelado" && "opacity-50 grayscale"
+                                )}>
+                                    <div className="flex items-center gap-6">
+                                        <div className="w-12 h-12 rounded-full border border-slate-100 bg-slate-50 flex items-center justify-center text-slate-400 font-bold shrink-0">
+                                            {event.status === "Cancelado" ? <Ban size={20} /> : <CalendarIcon size={20} className="text-blue-500/50" />}
                                         </div>
 
-                                        <h3 className="text-xl font-bold text-gray-800 leading-tight">
-                                            {(event as any).title || `Batismo - ${formatDate((event as any).date)}`}
-                                        </h3>
-
-                                        {((event as any).description || (event as any).observations) && (
-                                            <p className="text-sm text-gray-500 line-clamp-2">{(event as any).description || (event as any).observations}</p>
-                                        )}
-
-                                        <div className="flex flex-wrap gap-4 pt-1">
-                                            {(event as any).location && (
-                                                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                                                    <MapPin size={14} className="text-stats-cyan" />
-                                                    {(event as any).location}
-                                                </div>
-                                            )}
-                                            {(event as any).maxParticipants && (
-                                                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                                                    <Users size={14} className="text-stats-green" />
-                                                    {(event as any).currentParticipants || 0} / {(event as any).maxParticipants} membros
-                                                </div>
-                                            )}
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <h3 className={cn("font-bold text-slate-900 text-[15px]", event.status === "Cancelado" && "line-through")}>
+                                                    {event.title}
+                                                </h3>
+                                                {event.status === "Cancelado" && (
+                                                    <span className="text-[10px] font-black uppercase tracking-tighter text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full">Cancelado</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3 text-[13px] text-slate-400 font-medium">
+                                                <span className="flex items-center gap-1.5 capitalize">
+                                                    {(() => {
+                                                        const d = new Date(event.date);
+                                                        if (isNaN(d.getTime())) return "Data Inválida";
+                                                        return format(d, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+                                                    })()}
+                                                    {event.time && ` às ${event.time}`}
+                                                </span>
+                                                <span className="text-slate-200">|</span>
+                                                <span className="flex items-center gap-1.5">
+                                                    <MapPinIcon className="w-3.5 h-3.5 text-slate-300" />
+                                                    {event.location || "Local"}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <Button variant="ghost" size="icon" className="text-gray-400 hover:text-stats-cyan">
-                                        <ChevronRight size={20} />
-                                    </Button>
+                                    {(isAdmin || isSecretary) && (
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:bg-white hover:shadow-sm rounded-full">
+                                                        <MoreHorizontal size={18} />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-40 rounded-2xl shadow-xl border-slate-100 p-1">
+                                                    <DropdownMenuItem onClick={() => handleEdit(event)} className="text-blue-600 gap-2 cursor-pointer font-medium py-2 rounded-xl focus:bg-blue-50">
+                                                        <PencilIcon size={14} /> Editar
+                                                    </DropdownMenuItem>
+                                                    {event.status !== "Cancelado" && (
+                                                        <DropdownMenuItem onClick={() => handleCancel(event.id)} className="text-rose-600 gap-2 cursor-pointer font-medium py-2 rounded-xl focus:bg-rose-50">
+                                                            <TrashIcon size={14} /> Cancelar Evento
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         ) : (
-                            <div className="text-center py-20 bg-gray-50/30">
-                                <div className="w-16 h-16 bg-white shadow-sm rounded-2xl flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                                    <CalendarIcon size={32} className="text-gray-300" />
-                                </div>
-                                <p className="text-gray-400 font-medium">Nenhum evento agendado para este mês</p>
-                                <Button variant="link" className="mt-2 text-stats-cyan font-bold" onClick={() => setSelectedMonth(new Date())}>
-                                    Voltar para o mês atual
-                                </Button>
+                            <div className="py-20 text-center">
+                                <p className="text-slate-300 font-medium text-sm">
+                                    Nenhum evento registrado para {date && !isNaN(date.getTime()) ? format(date, "dd 'de' MMMM", { locale: ptBR }) : "--"}.
+                                </p>
                             </div>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+                        )
+                    ) : (
+                        <div className="py-20 text-center">
+                            <p className="text-slate-300 font-medium text-sm">Selecione um dia no calendário para ver os compromissos.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* 2. Coluna da Direita: Calendário Ajustado para 400px */}
+            <div className="w-full lg:w-[400px] shrink-0">
+                <div className="p-8 border border-slate-50 rounded-[2.5rem] bg-white shadow-sm">
+                    <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={setDate}
+                        locale={ptBR}
+                        className="w-full flex justify-center"
+                    />
+                </div>
+            </div>
+
+            <AgendaFormModal
+                open={modalOpen}
+                onOpenChange={(open) => {
+                    setModalOpen(open);
+                    if (!open) setSelectedEvent(null);
+                }}
+                initialData={selectedEvent}
+                onSubmit={async (data) => {
+                    if (selectedEvent) {
+                        await updateMutation.mutateAsync({ id: selectedEvent.id, ...data });
+                    } else {
+                        await createMutation.mutateAsync(data);
+                    }
+                }}
+                isLoading={createMutation.isPending || updateMutation.isPending}
+            />
         </div>
     );
 }

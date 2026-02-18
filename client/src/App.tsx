@@ -4,8 +4,11 @@ import Agenda from "./pages/Agenda";
 import Baptisms from "./pages/Baptisms";
 import Requests from "./pages/Requests";
 import Meetings from "./pages/Meetings";
+import Members from "./pages/Members";
 import Formation from "./pages/Formation";
 import Finance from "./pages/Finance";
+import Events from "./pages/Events";
+import Communication from "./pages/Communication";
 import Login from "./pages/Login";
 import DashboardLayout from "./components/DashboardLayout";
 import { Switch, Route } from "wouter";
@@ -87,6 +90,9 @@ function Router() {
                 <Route path="/finance" component={Finance} />
                 <Route path="/meetings" component={Meetings} />
                 <Route path="/formation" component={Formation} />
+                <Route path="/events" component={Events} />
+                <Route path="/members" component={Members} />
+                <Route path="/communication" component={Communication} />
                 <Route path="/sign-in">
                     <div className="flex items-center justify-center min-h-screen">
                         <SignIn routing="path" path="/sign-in" />

@@ -28,7 +28,7 @@ export class SDKServer {
 
             // Clerk authenticateRequest exige uma URL absoluta no ambiente Node.
             const protocol = req.headers['x-forwarded-proto'] || 'http';
-            const host = req.headers.host || 'localhost:3000';
+            const host = req.headers.host || 'localhost:5000';
 
             // Usamos originalUrl para garantir o path completo desde a raiz /api/trpc
             let path = req.originalUrl || req.url;
