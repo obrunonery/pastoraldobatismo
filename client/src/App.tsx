@@ -9,6 +9,7 @@ import Formation from "./pages/Formation";
 import Finance from "./pages/Finance";
 import Events from "./pages/Events";
 import Communication from "./pages/Communication";
+import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import DashboardLayout from "./components/DashboardLayout";
 import { Switch, Route } from "wouter";
@@ -93,15 +94,9 @@ function Router() {
                 <Route path="/events" component={Events} />
                 <Route path="/members" component={Members} />
                 <Route path="/communication" component={Communication} />
-                <Route path="/sign-in">
-                    <div className="flex items-center justify-center min-h-screen">
-                        <SignIn routing="path" path="/sign-in" />
-                    </div>
-                </Route>
-                <Route path="/sign-up">
-                    <div className="flex items-center justify-center min-h-screen">
-                        <SignUp routing="path" path="/sign-up" />
-                    </div>
+                <Route path="/profile" component={Profile} />
+                <Route path="/settings">
+                    <Profile />
                 </Route>
                 <Route component={NotFound} />
             </Switch>

@@ -1,13 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
     Droplet, Users, Calendar, Bell, Plus,
     Check, X, Lock, Unlock, BarChart3,
     AlertCircle, FileDown, MapPin, Clock,
     ChevronRight, Info, Wallet, Settings2, Target,
-    Eraser
+    Eraser, TrendingUp, Filter, Video
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
@@ -44,6 +43,24 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { motion, AnimatePresence } from "framer-motion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatCurrency } from "@/lib/utils";
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1
+        }
+    }
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+};
 
 export default function Home() {
     const { user } = useUser();
@@ -67,7 +84,6 @@ export default function Home() {
     });
     const { data: evolutionData } = trpc.dashboard.getEvolutionData.useQuery(filters);
     const { data: financeBI } = trpc.dashboard.getFinanceBI.useQuery();
-    const { data: serverGoal, refetch: refetchGoal } = trpc.dashboard.getAnnualGoal.useQuery();
     const { data: uniqueCities } = trpc.dashboard.getUniqueCities.useQuery();
 
     // Alert: Baptisms without assigned members
@@ -100,9 +116,6 @@ export default function Home() {
 
     // BI Calculation
     const currentYearNum = new Date().getFullYear();
-    const [annualGoal, setAnnualGoal] = useState<number>(100);
-    const [isEditingGoal, setIsEditingGoal] = useState(false);
-    const [goalInputValue, setGoalInputValue] = useState(100);
 
     const yearOptions = useMemo(() => {
         const years = [];
@@ -112,452 +125,417 @@ export default function Home() {
         return years;
     }, []);
 
-    const goalToDisplay = serverGoal ?? 100;
-
-    const goalMutation = trpc.dashboard.updateAnnualGoal.useMutation({
-        onSuccess: () => {
-            toast.success("Meta atualizada com sucesso!");
-            refetchGoal();
-        }
-    });
-
-    const handleSaveGoal = () => {
-        goalMutation.mutate({ goal: goalInputValue });
-        setIsEditingGoal(false);
-    };
-
-    const currentYearTotal = useMemo(() => {
-        if (!Array.isArray(evolutionData)) return 0;
-        // Only sum data for the current year for the progress card
-        return evolutionData
-            .filter((d: any) => d.year === currentYearNum)
-            .reduce((acc: number, curr: any) => acc + curr.quantity, 0);
-    }, [evolutionData, currentYearNum]);
-
-    const progressPercentage = Math.min(100, (currentYearTotal / goalToDisplay) * 100);
-
-    const exportToCSV = () => {
-        if (!Array.isArray(evolutionData)) return;
-        const headers = ["Mês", "Quantidade"];
-        const rows = evolutionData.map((d: any) => `${d.name},${d.quantity}`);
-        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "relatorio_evolucao_batismo.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const formatFinanceMonth = (monthStr: string) => {
+        if (!monthStr || !monthStr.includes('-')) return monthStr;
+        const [year, month] = monthStr.split('-');
+        const monthNames: Record<string, string> = {
+            '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr', '05': 'Mai', '06': 'Jun',
+            '07': 'Jul', '08': 'Ago', '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
+        };
+        return `${monthNames[month] || month}-${year}`;
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
-            {/* 6. Header Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight">
-                        Olá, {user?.firstName || "Membro"}. Bem-vindo à Pastoral do Batismo
+        <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={containerVariants}
+            className="space-y-10 bg-slate-50/50 min-h-screen p-2 sm:p-6 rounded-[40px] pb-24"
+        >
+            {/* Header Section */}
+            <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-4">
+                <div className="space-y-1">
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
+                        Olá, {user?.firstName || "Membro"} 👋
                     </h1>
-                    <p className="text-slate-500 mt-1 font-medium italic">
-                        Gestão da Pastoral de Batismo da Paróquia São João Paulo II
+                    <p className="text-[12px] font-black uppercase text-slate-300 tracking-[0.2em]">
+                        Gestão da Pastoral de Batismo • Paróquia São João Paulo II
                     </p>
                 </div>
-            </div>
-
-            {/* 1. Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="border-none shadow-sm overflow-hidden relative group">
-                    <div className="absolute left-0 top-0 w-1.5 h-full bg-stats-cyan" />
-                    <CardHeader className="pb-2 space-y-0">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Próximo Batismo</p>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center justify-between">
-                            <span className="text-2xl font-black text-slate-800">
-                                {summary?.nextBaptism ? formatDate(summary.nextBaptism.date) : "--/--/--"}
-                            </span>
-                            <div className="w-10 h-10 rounded-2xl bg-stats-cyan/10 text-stats-cyan flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Droplet size={20} fill="currentColor" />
-                            </div>
-                        </div>
-                        {summary?.nextBaptism && !summary.nextBaptism.docsOk && (
-                            <Badge variant="destructive" className="mt-4 text-[9px] font-black gap-1 py-0.5">
-                                <AlertCircle size={10} /> DOCUMENTAÇÃO PENDENTE
-                            </Badge>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm overflow-hidden relative group">
-                    <div className="absolute left-0 top-0 w-1.5 h-full bg-stats-purple" />
-                    <CardHeader className="pb-2 space-y-0">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Próxima Reunião</p>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between">
-                        <span className="text-2xl font-black text-slate-800">
-                            {summary?.nextMeeting ? formatDate(summary.nextMeeting.meetingDate) : "--/--/--"}
-                        </span>
-                        <div className="w-10 h-10 rounded-2xl bg-stats-purple/10 text-stats-purple flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Users size={20} />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm overflow-hidden relative group">
-                    <div className="absolute left-0 top-0 w-1.5 h-full bg-stats-green" />
-                    <CardHeader className="pb-2 space-y-0">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Próximo Evento</p>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between">
-                        <span className="text-2xl font-black text-slate-800">
-                            {summary?.nextEvent ? formatDate(summary.nextEvent.date) : "--/--/--"}
-                        </span>
-                        <div className="w-10 h-10 rounded-2xl bg-stats-green/10 text-stats-green flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Calendar size={20} />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm overflow-hidden relative group">
-                    <div className="absolute left-0 top-0 w-1.5 h-full bg-stats-orange" />
-                    <CardHeader className="pb-2 space-y-0">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Avisos Ativos</p>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between">
-                        <span className="text-4xl font-black text-slate-800">{summary?.notificationsCount || 0}</span>
-                        <div className="w-10 h-10 rounded-2xl bg-stats-orange/10 text-stats-orange flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Bell size={20} />
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Pendências Operacionais Alert */}
-            {unassignedBaptisms.length > 0 && (
-                <div className="bg-stats-orange/10 border border-stats-orange/20 rounded-3xl p-6 flex items-start gap-5 animate-in slide-in-from-top-4 duration-700">
-                    <div className="w-14 h-14 rounded-2xl bg-stats-orange text-white flex items-center justify-center shrink-0 shadow-lg shadow-stats-orange/20">
-                        <Users size={28} />
-                    </div>
-                    <div className="space-y-1 py-1">
-                        <h3 className="text-xl font-black text-slate-800 tracking-tight">Escalas Pendentes</h3>
-                        <p className="text-slate-600 font-medium">
-                            Existem <span className="font-black text-stats-orange">{unassignedBaptisms.length} batismos agendados</span> que ainda não possuem celebrante ou equipe completa atribuída.
-                        </p>
-                        <Button onClick={() => window.location.href = "/baptisms"} variant="link" className="p-0 h-auto text-stats-orange text-xs font-black uppercase tracking-widest mt-2 gap-1 group">
-                            RESOLVER AGORA <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                        </Button>
+                <div className="flex items-center gap-3">
+                    <button className="h-12 w-12 bg-white rounded-full shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-stats-cyan transition-all">
+                        <Bell size={20} />
+                    </button>
+                    <div className="h-12 px-6 bg-white rounded-full shadow-sm border border-slate-100 flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Sistema Online</span>
                     </div>
                 </div>
-            )}
+            </motion.div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* 2. Management Section (Scale & RBAC) */}
-                <div className="lg:col-span-12 xl:col-span-5 space-y-6">
-                    <Card className="border-none shadow-lg">
-                        <CardHeader className="pb-4 flex flex-row items-center justify-between border-b border-slate-50">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-red-400/10 text-red-500 flex items-center justify-center">
-                                    <Droplet size={18} fill="currentColor" />
+            <Tabs defaultValue="geral" className="w-full space-y-10">
+                <div className="px-4">
+                    <TabsList className="bg-white/50 backdrop-blur-sm border border-slate-100 p-1.5 rounded-3xl h-14 w-fit shadow-sm">
+                        <TabsTrigger
+                            value="geral"
+                            className="rounded-2xl px-8 h-full data-[state=active]:bg-stats-cyan data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-stats-cyan/20 text-xs font-black uppercase tracking-widest transition-all gap-2"
+                        >
+                            <BarChart3 size={16} /> Visão Geral
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="financeiro"
+                            className="rounded-2xl px-8 h-full data-[state=active]:bg-stats-cyan data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-stats-cyan/20 text-xs font-black uppercase tracking-widest transition-all gap-2"
+                        >
+                            <Wallet size={16} /> Financeiro
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
+
+                <TabsContent value="geral" className="space-y-10 outline-none m-0">
+
+                    {/* Summary Cards */}
+                    <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4">
+                        {[
+                            { title: "Próximo Batismo", value: summary?.nextBaptism ? formatDate(summary.nextBaptism.date) : "--/--/--", icon: Droplet, color: "stats-cyan", pulse: summary?.nextBaptism && !summary.nextBaptism.docsOk },
+                            { title: "Próxima Reunião", value: summary?.nextMeeting ? formatDate(summary.nextMeeting.meetingDate) : "--/--/--", icon: (summary?.nextMeeting as any)?.type?.toLowerCase().includes('online') ? Video : Users, color: (summary?.nextMeeting as any)?.type?.toLowerCase().includes('online') ? "emerald-500" : "stats-purple" },
+                            { title: "Próximo Evento", value: summary?.nextEvent ? formatDate(summary.nextEvent.date) : "--/--/--", icon: Calendar, color: "stats-green" },
+                            { title: "Avisos Ativos", value: summary?.notificationsCount || 0, icon: Bell, color: "stats-orange" }
+                        ].map((stat, i) => (
+                            <div key={i} className="group bg-white rounded-[32px] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.02)] border border-slate-50 relative overflow-hidden transition-all hover:shadow-[0_30px_60px_rgba(0,0,0,0.04)]">
+                                <div className={cn("absolute top-0 right-0 w-24 h-24 blur-3xl opacity-5 transition-opacity group-hover:opacity-10", `bg-${stat.color}`)} />
+                                <div className="relative z-10 flex flex-col gap-4">
+                                    <div className={cn("w-12 h-12 rounded-[18px] flex items-center justify-center transition-transform group-hover:scale-110", `bg-${stat.color}/10 text-${stat.color}`)}>
+                                        <stat.icon size={22} fill={stat.icon === Droplet ? "currentColor" : "none"} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">{stat.title}</p>
+                                        <h3 className="text-2xl font-black text-slate-800 tracking-tight">{stat.value}</h3>
+                                    </div>
+                                    {stat.pulse && (
+                                        <Badge variant="destructive" className="w-fit text-[9px] font-black gap-1 py-1 px-3 rounded-full animate-pulse border-none">
+                                            <AlertCircle size={10} /> DOCUMENTAÇÃO PENDENTE
+                                        </Badge>
+                                    )}
                                 </div>
-                                <CardTitle className="text-lg font-bold">Batismos Previstos</CardTitle>
                             </div>
-                        </CardHeader>
-                        <CardContent className="pt-6 space-y-4">
-                            {allScales.length > 0 ? (
-                                <div className="space-y-3">
-                                    {allScales.map((scale: any, index: number) => {
-                                        // Safe date parsing to prevent "Invalid time value" errors
-                                        const eventDate = new Date((scale.baptism.date || "") + "T12:00:00");
-                                        const isValidDate = !isNaN(eventDate.getTime());
-                                        const day = isValidDate ? eventDate.getDate() : "--";
-                                        const month = isValidDate
-                                            ? eventDate.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
-                                            : "INV";
+                        ))}
+                    </motion.div>
 
-                                        return (
-                                            <div
-                                                key={scale.baptism.id}
-                                                onClick={() => {
-                                                    setSelectedScaleIndex(index);
-                                                    setScaleDetailsOpen(true);
-                                                }}
-                                                className="group flex items-center gap-5 p-4 bg-slate-50/50 hover:bg-white border border-slate-100/50 hover:border-stats-cyan/30 hover:shadow-xl hover:shadow-stats-cyan/5 rounded-[2rem] transition-all cursor-pointer"
+                    {/* Alerts */}
+                    <AnimatePresence>
+                        {unassignedBaptisms.length > 0 && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                variants={itemVariants}
+                                className="px-4"
+                            >
+                                <div className="bg-stats-orange rounded-[40px] p-8 text-white relative overflow-hidden shadow-2xl shadow-stats-orange/20 ring-4 ring-stats-orange/5 group">
+                                    <Users className="absolute -right-8 -bottom-8 w-48 h-48 opacity-10 group-hover:rotate-12 transition-transform duration-1000" />
+                                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                                        <div className="space-y-2">
+                                            <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
+                                                <AlertCircle size={24} />
+                                            </div>
+                                            <h3 className="text-2xl font-black tracking-tighter">Escalas Pendentes de Celebrante</h3>
+                                            <p className="text-white/80 font-medium max-w-xl">
+                                                Existem <span className="font-black text-white">{unassignedBaptisms.length} batismos</span> que ainda não possuem celebrante atribuído. A definição das equipes é fundamental para a organização.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => window.location.href = "/baptisms"}
+                                            className="bg-white text-stats-orange px-8 py-4 rounded-full text-xs font-black uppercase tracking-widest shadow-xl hover:bg-slate-50 active:scale-95 transition-all flex items-center gap-2"
+                                        >
+                                            RESOLVER AGORA <ChevronRight size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
+                        {/* Evolution & Filters */}
+                        <motion.div variants={itemVariants} className="lg:col-span-8 space-y-8">
+                            <div className="bg-white rounded-[40px] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.02)] border border-slate-50 space-y-8">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-50">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-stats-cyan/10 text-stats-cyan flex items-center justify-center">
+                                            <BarChart3 size={24} />
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <h2 className="text-xl font-black text-slate-800 tracking-tight">Evolução de Batizados</h2>
+                                            <p className="text-[10px] font-black uppercase text-slate-300 tracking-[0.2em]">Filtros e Análise Geográfica</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={handleClearFilters}
+                                            className="h-10 px-4 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                                        >
+                                            <Eraser size={14} /> Limpar
+                                        </button>
+                                        <div className="h-10 w-[1px] bg-slate-100 mx-2" />
+                                    </div>
+                                </div>
+
+                                {/* Chart Filters */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    {[
+                                        { label: "Sexo", value: filters.gender || "all", key: "gender", options: [{ v: "all", l: "Todos" }, { v: "m", l: "Masculino" }, { v: "f", l: "Feminino" }] },
+                                        { label: "Cidade", value: filters.city || "all", key: "city", options: [{ v: "all", l: "Todas" }, ...(uniqueCities?.map((c: any) => ({ v: c, l: c })) || [])] },
+                                        { label: "Idade", value: filters.ageGroup || "all", key: "ageGroup", options: [{ v: "all", l: "Todas" }, { v: "child", l: "Criança" }, { v: "adult", l: "Adulto" }] },
+                                        { label: "Período", value: filters.year, key: "year", options: yearOptions.map(y => ({ v: y, l: y })) }
+                                    ].map((filter, idx) => (
+                                        <div key={idx} className="space-y-1.5">
+                                            <Label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 ml-2">
+                                                <Filter size={10} className="text-slate-300" /> {filter.label}
+                                            </Label>
+                                            <Select
+                                                value={filter.value}
+                                                onValueChange={(v) => setFilters(f => ({ ...f, [filter.key]: v === "all" ? undefined : v }))}
                                             >
-                                                <div className="w-14 h-14 shrink-0 rounded-2xl bg-white border border-slate-100 flex flex-col items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                                                    <span className="text-xl font-black text-slate-800 leading-none">{day}</span>
-                                                    <span className="text-[10px] font-black uppercase text-stats-cyan mt-1">{month}</span>
-                                                </div>
+                                                <SelectTrigger className="h-12 rounded-2xl bg-slate-50/50 border-transparent hover:border-slate-100 transition-all shadow-none text-xs font-bold text-slate-600">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className="rounded-2xl border-slate-50 shadow-2xl p-1">
+                                                    {filter.options.map(opt => (
+                                                        <SelectItem key={opt.v} value={opt.v} className="rounded-xl font-bold text-xs py-2.5">{opt.l}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    ))}
+                                </div>
 
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-slate-800 text-lg truncate group-hover:text-stats-cyan transition-colors">
-                                                        {scale.baptism.childName}
-                                                    </h3>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <Badge className={cn(
-                                                            "text-[9px] font-black px-1.5 py-0.5 rounded-md border-none",
-                                                            scale.baptism.docsOk ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                                                        )}>
-                                                            {scale.baptism.docsOk ? "DOCS OK" : "DOCS PENDENTES"}
-                                                        </Badge>
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                                            {scale.members.length} {scale.members.length === 1 ? 'Membro' : 'Membros'}
-                                                        </span>
-                                                    </div>
-                                                </div>
+                                <div className="h-[350px] w-full pt-4">
+                                    {Array.isArray(evolutionData) && evolutionData.length > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={evolutionData}>
+                                                <defs>
+                                                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="0%" stopColor="#1eb7e6" stopOpacity={1} />
+                                                        <stop offset="100%" stopColor="#1eb7e6" stopOpacity={0.6} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="#f1f5f9" />
+                                                <XAxis
+                                                    dataKey="name"
+                                                    axisLine={false}
+                                                    tickLine={false}
+                                                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 900 }}
+                                                    dy={15}
+                                                />
+                                                <YAxis
+                                                    axisLine={false}
+                                                    tickLine={false}
+                                                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 900 }}
+                                                />
+                                                <Tooltip
+                                                    cursor={{ fill: '#f8fafc', radius: 10 }}
+                                                    contentStyle={{
+                                                        borderRadius: '24px',
+                                                        border: 'none',
+                                                        boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)',
+                                                        padding: '16px'
+                                                    }}
+                                                    itemStyle={{ fontWeight: '800', fontSize: '12px' }}
+                                                />
+                                                <Bar dataKey="quantity" radius={[12, 12, 0, 0]} barSize={40}>
+                                                    {evolutionData.map((entry: any, index: number) => (
+                                                        <Cell key={`cell-${index}`} fill="url(#barGradient)" />
+                                                    ))}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
+                                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center border border-dashed border-slate-200">
+                                                <BarChart3 size={32} />
+                                            </div>
+                                            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Sem registros encontrados</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </motion.div>
 
-                                                <div className="w-10 h-10 rounded-full bg-slate-100/50 flex items-center justify-center text-slate-300 group-hover:bg-stats-cyan group-hover:text-white transition-all">
-                                                    <ChevronRight size={20} />
+                        {/* Sidebar: Batismos & Goals */}
+                        <motion.div variants={itemVariants} className="lg:col-span-4 space-y-8">
+                            {/* Batismos Previstos Card */}
+                            <div className="bg-white rounded-[40px] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.02)] border border-slate-50 flex flex-col h-full">
+                                <div className="flex items-center justify-between mb-8 px-2">
+                                    <div className="space-y-0.5">
+                                        <h2 className="text-xl font-black text-slate-800 tracking-tight">Escalas da Pastoral</h2>
+                                        <p className="text-[10px] font-black uppercase text-slate-300 tracking-[0.2em]">Batismos das próximas 4 semanas</p>
+                                    </div>
+                                    <div className="w-10 h-10 rounded-xl bg-stats-pink/10 text-stats-pink flex items-center justify-center">
+                                        <Droplet size={20} fill="currentColor" />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                                    <AnimatePresence mode="popLayout">
+                                        {allScales.length > 0 ? (
+                                            allScales.map((scale: any, index: number) => {
+                                                const eventDate = new Date((scale.baptism.date || "") + "T12:00:00");
+                                                const day = !isNaN(eventDate.getTime()) ? eventDate.getDate() : "--";
+                                                const month = !isNaN(eventDate.getTime())
+                                                    ? eventDate.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()
+                                                    : "INV";
+
+                                                return (
+                                                    <motion.div
+                                                        key={scale.baptism.id}
+                                                        layout
+                                                        initial={{ opacity: 0, x: 20 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        onClick={() => {
+                                                            setSelectedScaleIndex(index);
+                                                            setScaleDetailsOpen(true);
+                                                        }}
+                                                        className="group p-4 bg-slate-50/50 hover:bg-white rounded-[28px] border border-transparent hover:border-slate-100 transition-all cursor-pointer hover:shadow-xl hover:shadow-stats-cyan/5 flex items-center gap-4"
+                                                    >
+                                                        <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex flex-col items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                                                            <span className="text-base font-black text-slate-800 leading-none">{day}</span>
+                                                            <span className="text-[8px] font-black text-stats-cyan mt-1 tracking-tighter">{month}</span>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="font-bold text-slate-700 text-sm truncate group-hover:text-stats-cyan transition-colors">{scale.baptism.childName}</h4>
+                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                <span className={cn(
+                                                                    "w-1.5 h-1.5 rounded-full",
+                                                                    scale.baptism.docsOk ? "bg-emerald-500" : "bg-stats-pink"
+                                                                )} />
+                                                                <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                                                                    {scale.members.length} membros na equipe
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-slate-200 group-hover:text-stats-cyan group-hover:bg-stats-cyan/5 transition-all">
+                                                            <ChevronRight size={18} />
+                                                        </div>
+                                                    </motion.div>
+                                                )
+                                            })
+                                        ) : (
+                                            <div className="py-12 text-center space-y-4">
+                                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto border border-dashed border-slate-200">
+                                                    <Calendar size={24} className="text-slate-200" />
+                                                </div>
+                                                <p className="text-[10px] font-black uppercase text-slate-300 tracking-widest px-8 leading-relaxed">Nenhum batismo futuro agendado na base de dados</p>
+                                            </div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+
+                        </motion.div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="financeiro" className="space-y-10 outline-none m-0">
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-10">
+                        {/* Finance Summary */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-4">
+                            {[
+                                { title: "Entradas (Ano)", value: financeBI?.reduce((acc: any, curr: any) => acc + (Number(curr.entry) || 0), 0) || 0, icon: TrendingUp, color: "emerald-500", bg: "emerald-50" },
+                                { title: "Saídas (Ano)", value: financeBI?.reduce((acc: any, curr: any) => acc + (Number(curr.exit) || 0), 0) || 0, icon: TrendingUp, color: "stats-pink", bg: "stats-pink/10", rotate: true },
+                                { title: "Saldo Atual", value: financeBI?.reduce((acc: any, curr: any) => acc + (Number(curr.balance) || 0), 0) || 0, icon: Wallet, color: "stats-cyan", bg: "stats-cyan/10" }
+                            ].map((stat, i) => (
+                                <div key={i} className="group bg-white rounded-[32px] p-8 shadow-[0_20px_50_rgba(0,0,0,0.02)] border border-slate-50 relative overflow-hidden transition-all hover:shadow-[0_30px_60px_rgba(0,0,0,0.04)]">
+                                    <div className="relative z-10 flex items-center justify-between">
+                                        <div className="space-y-2">
+                                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">{stat.title}</p>
+                                            <h3 className={cn("text-3xl font-black tracking-tight transition-colors", i === 0 ? "text-emerald-500" : i === 1 ? "text-stats-pink" : "text-stats-cyan")}>
+                                                {formatCurrency(stat.value)}
+                                            </h3>
+                                        </div>
+                                        <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:rotate-12", i === 0 ? "bg-emerald-50 text-emerald-500" : i === 1 ? "bg-stats-pink/10 text-stats-pink" : "bg-stats-cyan/10 text-stats-cyan")}>
+                                            <stat.icon size={24} className={cn(stat.rotate && "rotate-180")} />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
+                            <div className="lg:col-span-8 bg-white rounded-[40px] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.02)] border border-slate-50">
+                                <div className="flex items-center gap-4 mb-8">
+                                    <div className="w-12 h-12 rounded-2xl bg-stats-cyan/10 text-stats-cyan flex items-center justify-center">
+                                        <BarChart3 size={24} />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <h2 className="text-xl font-black text-slate-800 tracking-tight">Evolução Financeira</h2>
+                                        <p className="text-[10px] font-black uppercase text-slate-300 tracking-[0.2em]">Fluxo de Caixa Mensal</p>
+                                    </div>
+                                </div>
+
+                                <div className="h-[350px] w-full pt-4">
+                                    {financeBI && financeBI.length > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={financeBI}>
+                                                <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="#f1f5f9" />
+                                                <XAxis
+                                                    dataKey="month"
+                                                    axisLine={false}
+                                                    tickLine={false}
+                                                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 900 }}
+                                                    tickFormatter={formatFinanceMonth}
+                                                />
+                                                <YAxis
+                                                    axisLine={false}
+                                                    tickLine={false}
+                                                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 900 }}
+                                                    tickFormatter={(v) => `R$ ${v}`}
+                                                />
+                                                <Tooltip
+                                                    cursor={{ fill: '#f8fafc', radius: 10 }}
+                                                    contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.1)', padding: '16px' }}
+                                                    formatter={(value: any) => [formatCurrency(value), ""]}
+                                                    itemStyle={{ fontWeight: '800', fontSize: '12px' }}
+                                                />
+                                                <Bar dataKey="entry" name="Entradas" fill="#10b981" radius={[8, 8, 0, 0]} barSize={20} />
+                                                <Bar dataKey="exit" name="Saídas" fill="#ef4444" radius={[8, 8, 0, 0]} barSize={20} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
+                                            <BarChart3 size={32} />
+                                            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Sem dados financeiros</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="lg:col-span-4 bg-white rounded-[40px] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.02)] border border-slate-50">
+                                <h3 className="text-lg font-black text-slate-800 mb-6">Resumo Mensal</h3>
+                                <div className="space-y-4">
+                                    {financeBI?.slice(-4).reverse().map((item: any) => (
+                                        <div key={item.month} className="p-4 rounded-3xl bg-stats-cyan/5 border border-transparent hover:border-slate-100 transition-all">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-xs font-black text-slate-900">{formatFinanceMonth(item.month)}</span>
+                                                <span className={cn("text-xs font-black", item.balance >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                                                    {formatCurrency(item.balance)}
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-0.5">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Entradas</p>
+                                                    <p className="text-[10px] font-black text-emerald-500">{formatCurrency(item.entry)}</p>
+                                                </div>
+                                                <div className="space-y-0.5 text-right">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Saídas</p>
+                                                    <p className="text-[10px] font-black text-rose-500">{formatCurrency(item.exit)}</p>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        </div>
+                                    ))}
                                 </div>
-                            ) : (
-                                <div className="text-center py-10 bg-slate-50/50 rounded-[2.5rem] border border-dashed border-slate-200">
-                                    <div className="w-12 h-12 rounded-full bg-white mx-auto mb-3 flex items-center justify-center text-slate-300 border border-slate-100 shadow-sm">
-                                        <Calendar size={20} />
-                                    </div>
-                                    <p className="text-sm text-slate-400 font-bold italic">
-                                        Nenhum batismo futuro agendado.
-                                    </p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Progress Goal */}
-                    <Card className="border-none shadow-lg bg-gradient-to-br from-stats-cyan to-stats-cyan/80 text-white overflow-hidden relative">
-                        <Droplet className="absolute -right-8 -bottom-8 w-40 h-40 opacity-10 rotate-12" fill="currentColor" />
-                        <CardHeader className="pb-0 flex flex-row items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <BarChart3 size={18} />
-                                <span className="text-xs font-black uppercase tracking-widest opacity-70">Meta de Batizados {currentYearNum}</span>
-                            </div>
-                            {isAdmin && (
-                                <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8 text-white hover:bg-white/10"
-                                    onClick={() => {
-                                        setGoalInputValue(goalToDisplay);
-                                        setIsEditingGoal(true);
-                                    }}
+                                <button
+                                    onClick={() => window.location.href = '/finance'}
+                                    className="w-full mt-8 py-4 bg-slate-50 hover:bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all flex items-center justify-center gap-2"
                                 >
-                                    <Target size={16} />
-                                </Button>
-                            )}
-                        </CardHeader>
-                        <CardContent className="pt-4 space-y-4">
-                            <div className="flex items-end justify-between">
-                                <span className="text-5xl font-black">{currentYearTotal}</span>
-                                <span className="text-sm font-bold pb-2 opacity-80">/ {goalToDisplay} batizados realizados</span>
+                                    Ver Detalhes <ChevronRight size={14} />
+                                </button>
                             </div>
-                            <div className="space-y-2">
-                                <Progress value={progressPercentage} className="h-3 bg-white/20 shadow-inner" />
-                                <div className="flex justify-between text-[10px] font-black tracking-wider">
-                                    <span>{Math.round(progressPercentage)}% CONCLUÍDO</span>
-                                    <span>FALTAM {Math.max(0, goalToDisplay - currentYearTotal)}</span>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </motion.div>
+                </TabsContent>
+            </Tabs>
 
-                    {/* Meta Edit Modal */}
-                    <Dialog open={isEditingGoal} onOpenChange={setIsEditingGoal}>
-                        <DialogContent className="sm:max-w-[425px] rounded-3xl border-none shadow-2xl">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl font-black text-slate-800 flex items-center gap-2">
-                                    <Target className="text-stats-cyan" />
-                                    Ajustar Meta Anual
-                                </DialogTitle>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-6">
-                                <div className="space-y-2">
-                                    <Label htmlFor="goal" className="text-sm font-bold text-slate-500 uppercase tracking-wider ml-1">Meta de Batizados ({currentYearNum})</Label>
-                                    <Input
-                                        id="goal"
-                                        type="number"
-                                        value={goalInputValue}
-                                        onChange={(e) => setGoalInputValue(Number(e.target.value))}
-                                        className="h-14 text-2xl font-black rounded-2xl border-slate-100 bg-slate-50 focus:ring-stats-cyan focus:border-stats-cyan"
-                                    />
-                                    <p className="text-xs text-slate-400 font-medium italic italic">Este valor será usado para calcular o progresso no Dashboard.</p>
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    onClick={handleSaveGoal}
-                                    className="w-full h-12 bg-stats-cyan hover:bg-stats-cyan/90 text-white font-black rounded-2xl shadow-lg shadow-stats-cyan/20 gap-2"
-                                >
-                                    <Check size={18} /> SALVAR NOVA META
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
 
-                    {/* Finance BI Chart */}
-                    <Card className="border-none shadow-lg">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg font-bold flex items-center gap-2">
-                                <Wallet className="text-stats-green" size={20} />
-                                Evolução Financeira
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[200px] w-full">
-                                {Array.isArray(financeBI) && financeBI.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={financeBI}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                            <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                                            <YAxis tick={{ fontSize: 10 }} />
-                                            <Tooltip />
-                                            <Bar dataKey="entry" fill="#22c55e" name="Entradas" />
-                                            <Bar dataKey="exit" fill="#ec4899" name="Saídas" />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-slate-400 italic text-sm">
-                                        Carregando dados financeiros...
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* 3. BI Evolution Chart Section */}
-                <div className="lg:col-span-12 xl:col-span-7 space-y-6">
-                    <Card className="border-none shadow-lg">
-                        <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-stats-cyan/10 text-stats-cyan flex items-center justify-center">
-                                    <BarChart3 size={18} />
-                                </div>
-                                <div>
-                                    <CardTitle className="text-lg font-bold text-slate-800">Evolução de Batizados</CardTitle>
-                                    <p className="text-xs text-slate-400 font-medium tracking-tight mt-0.5">Visão mensal consolidada</p>
-                                </div>
-                            </div>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleClearFilters}
-                                className="h-8 rounded-xl text-slate-400 hover:text-stats-cyan hover:bg-stats-cyan/5 gap-2 text-[10px] font-black uppercase tracking-widest border border-slate-100 shadow-sm"
-                            >
-                                <Eraser size={14} /> Limpar Filtros
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="space-y-8">
-                            {/* Charts Filters */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                <div className="space-y-1.5">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Sexo</span>
-                                    <Select value={filters.gender || "all"} onValueChange={(v) => setFilters(f => ({ ...f, gender: v === "all" ? undefined : v }))}>
-                                        <SelectTrigger className="h-9 rounded-xl bg-white border-none shadow-sm text-xs font-bold">
-                                            <SelectValue placeholder="Todos" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">Todos</SelectItem>
-                                            <SelectItem value="m">Masculino</SelectItem>
-                                            <SelectItem value="f">Feminino</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Cidade</span>
-                                    <Select value={filters.city || "all"} onValueChange={(v) => setFilters(f => ({ ...f, city: v === "all" ? undefined : v }))}>
-                                        <SelectTrigger className="h-9 rounded-xl bg-white border-none shadow-sm text-xs font-bold">
-                                            <SelectValue placeholder="Todas" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">Todas</SelectItem>
-                                            {Array.isArray(uniqueCities) && uniqueCities.map((city: string) => (
-                                                <SelectItem key={city} value={city}>{city}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Idade</span>
-                                    <Select
-                                        value={filters.ageGroup || "all"}
-                                        onValueChange={(v) => setFilters(f => ({ ...f, ageGroup: v === "all" ? undefined : v }))}
-                                    >
-                                        <SelectTrigger className="h-9 rounded-xl bg-white border-none shadow-sm text-xs font-bold">
-                                            <SelectValue placeholder="Todas" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">Todas</SelectItem>
-                                            <SelectItem value="child">Criança</SelectItem>
-                                            <SelectItem value="adult">Adulto</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase ml-1">Período</span>
-                                    <Select
-                                        value={filters.year}
-                                        onValueChange={(v) => setFilters(f => ({ ...f, year: v }))}
-                                    >
-                                        <SelectTrigger className="h-9 rounded-xl bg-white border-none shadow-sm text-xs font-bold">
-                                            <SelectValue placeholder="2026" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {yearOptions.map(y => (
-                                                <SelectItem key={y} value={y}>{y}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            {/* Actual Chart */}
-                            <div className="h-[320px] w-full">
-                                {Array.isArray(evolutionData) && evolutionData.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={evolutionData}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                            <XAxis
-                                                dataKey="name"
-                                                axisLine={false}
-                                                tickLine={false}
-                                                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
-                                                dy={10}
-                                            />
-                                            <YAxis
-                                                axisLine={false}
-                                                tickLine={false}
-                                                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
-                                            />
-                                            <Tooltip
-                                                cursor={{ fill: '#f8fafc' }}
-                                                contentStyle={{
-                                                    borderRadius: '16px',
-                                                    border: 'none',
-                                                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                                                    padding: '12px'
-                                                }}
-                                            />
-                                            <Bar dataKey="quantity" radius={[6, 6, 0, 0]} barSize={32}>
-                                                {evolutionData.map((entry: any, index: number) => (
-                                                    <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#1eb7e6' : '#a1e3f5'} />
-                                                ))}
-                                            </Bar>
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-2">
-                                        <BarChart3 size={40} className="opacity-20" />
-                                        <p className="text-xs font-bold italic">Sem dados suficientes para o gráfico no momento.</p>
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                </div>
-            </div>
             {currentScale && (
                 <ScaleDetailsModal
                     open={scaleDetailsOpen}
@@ -577,6 +555,6 @@ export default function Home() {
                     currentScale={currentScale.members}
                 />
             )}
-        </div>
+        </motion.div>
     );
 }

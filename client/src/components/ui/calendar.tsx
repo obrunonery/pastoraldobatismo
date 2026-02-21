@@ -7,14 +7,25 @@ import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 
-export type CalendarProps = React.ComponentProps<typeof DayPicker>
+export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
+    eventDates?: Date[];
+}
 
 function Calendar({
     className,
     classNames,
     showOutsideDays = true,
+    eventDates = [],
     ...props
 }: CalendarProps) {
+    const hasEvent = (day: Date) => {
+        return eventDates.some(eventDate =>
+            day.getDate() === eventDate.getDate() &&
+            day.getMonth() === eventDate.getMonth() &&
+            day.getFullYear() === eventDate.getFullYear()
+        );
+    };
+
     return (
         <DayPicker
             showOutsideDays={showOutsideDays}
@@ -48,6 +59,12 @@ function Calendar({
                 hidden: "invisible",
                 ...classNames,
             }}
+            modifiers={{
+                hasEvent: (date) => hasEvent(date)
+            }}
+            modifiersClassNames={{
+                hasEvent: "relative after:content-[''] after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:bg-blue-600 after:rounded-full"
+            }}
             components={{
                 Chevron: (props) => {
                     if (props.orientation === 'left') return <ChevronLeft className="h-4 w-4" />
@@ -57,46 +74,52 @@ function Calendar({
                     const { goToMonth } = useDayPicker();
                     const month = props.calendarMonth.date;
 
-                    const handlePrevYear = (e: React.MouseEvent) => {
+                    const handlePrevMonth = (e: React.MouseEvent) => {
                         e.preventDefault();
                         if (month && !isNaN(month.getTime())) {
-                            goToMonth(addYears(month, -1));
+                            const newDate = new Date(month);
+                            newDate.setMonth(newDate.getMonth() - 1);
+                            goToMonth(newDate);
                         }
                     };
 
-                    const handleNextYear = (e: React.MouseEvent) => {
+                    const handleNextMonth = (e: React.MouseEvent) => {
                         e.preventDefault();
                         if (month && !isNaN(month.getTime())) {
-                            goToMonth(addYears(month, 1));
+                            const newDate = new Date(month);
+                            newDate.setMonth(newDate.getMonth() + 1);
+                            goToMonth(newDate);
                         }
                     };
 
                     return (
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xl font-bold text-slate-900 tracking-tight capitalize">
-                                {month && !isNaN(month.getTime())
-                                    ? format(month, "MMMM", { locale: ptBR })
-                                    : "Mês Inválido"}
-                            </span>
-                            <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-xl border border-slate-100 ml-1">
-                                <button
-                                    onClick={handlePrevYear}
-                                    className="p-1 hover:bg-white hover:shadow-sm rounded-md transition-all text-slate-400 hover:text-blue-600 cursor-pointer"
-                                    type="button"
-                                >
-                                    <ChevronLeft className="h-3 w-3" />
-                                </button>
-                                <span className="text-sm font-black text-slate-900 mx-1 tabular-nums">
+                        <div className="flex items-center justify-center gap-4 mb-2 w-full relative">
+                            <button
+                                onClick={handlePrevMonth}
+                                className="p-2 hover:bg-slate-50 rounded-full transition-all text-slate-400 hover:text-blue-600 cursor-pointer absolute left-0"
+                                type="button"
+                            >
+                                <ChevronLeft className="h-5 w-5" />
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-xl font-bold text-slate-900 tracking-tight capitalize">
+                                    {month && !isNaN(month.getTime())
+                                        ? format(month, "MMMM", { locale: ptBR })
+                                        : "Mês Inválido"}
+                                </span>
+                                <span className="text-xl font-bold text-slate-900 tracking-tight tabular-nums">
                                     {month && !isNaN(month.getTime()) ? month.getFullYear() : "----"}
                                 </span>
-                                <button
-                                    onClick={handleNextYear}
-                                    className="p-1 hover:bg-white hover:shadow-sm rounded-md transition-all text-slate-400 hover:text-blue-600 cursor-pointer"
-                                    type="button"
-                                >
-                                    <ChevronRight className="h-3 w-3" />
-                                </button>
                             </div>
+
+                            <button
+                                onClick={handleNextMonth}
+                                className="p-2 hover:bg-slate-50 rounded-full transition-all text-slate-400 hover:text-blue-600 cursor-pointer absolute right-0"
+                                type="button"
+                            >
+                                <ChevronRight className="h-5 w-5" />
+                            </button>
                         </div>
                     );
                 }

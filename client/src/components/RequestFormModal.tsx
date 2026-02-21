@@ -22,6 +22,7 @@ interface RequestFormModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSubmit: (data: any) => Promise<void>;
+    initialData?: any;
     isLoading?: boolean;
 }
 
@@ -29,6 +30,7 @@ export function RequestFormModal({
     open,
     onOpenChange,
     onSubmit,
+    initialData,
     isLoading
 }: RequestFormModalProps) {
     const { register, handleSubmit, reset, setValue, watch } = useForm({
@@ -45,14 +47,14 @@ export function RequestFormModal({
 
     useEffect(() => {
         if (open) {
-            reset({
+            reset(initialData || {
                 title: "",
                 type: "request",
                 urgency: "medium",
                 description: ""
             });
         }
-    }, [reset, open]);
+    }, [reset, open, initialData]);
 
     const handleFormSubmit = async (data: any) => {
         await onSubmit(data);
@@ -63,7 +65,7 @@ export function RequestFormModal({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Nova Solicitação</DialogTitle>
+                    <DialogTitle>{initialData ? "Editar Solicitação" : "Nova Solicitação"}</DialogTitle>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 py-4">
@@ -111,7 +113,7 @@ export function RequestFormModal({
                             Cancelar
                         </Button>
                         <Button type="submit" disabled={isLoading} className="bg-stats-cyan hover:bg-stats-cyan/90">
-                            {isLoading ? "Enviando..." : "Criar Solicitação"}
+                            {isLoading ? "Enviando..." : (initialData ? "Salvar Alterações" : "Criar Solicitação")}
                         </Button>
                     </DialogFooter>
                 </form>

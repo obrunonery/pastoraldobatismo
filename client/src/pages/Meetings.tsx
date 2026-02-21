@@ -1,12 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Users, MapPin, Clock, ChevronRight, Share2, AlertCircle, Edit, Trash2, Download, FileUp, MoreHorizontal } from "lucide-react";
+import { Plus, FileText, Users, MapPin, Clock, ChevronRight, Share2, AlertCircle, Edit, Trash2, Download, FileUp, MoreHorizontal, Video, Home, Calendar } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import axios from "axios";
 import { trpc } from "@/lib/trpc";
 import { useRole } from "@/hooks/useRole";
-import { formatDate } from "@/lib/date-utils";
+import { formatDate, getSmartBadge } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +42,10 @@ export default function Meetings() {
             toast.success("Ata de reunião salva!");
             utils.meeting.list.invalidate();
             setModalOpen(false);
+        },
+        onError: (error) => {
+            console.error("[MEETINGS] Create Error:", error);
+            toast.error("Erro ao salvar reunião: " + error.message);
         }
     });
 
@@ -51,6 +55,10 @@ export default function Meetings() {
             utils.meeting.list.invalidate();
             setModalOpen(false);
             setSelectedMeeting(null);
+        },
+        onError: (error) => {
+            console.error("[MEETINGS] Update Error:", error);
+            toast.error("Erro ao atualizar reunião: " + error.message);
         }
     });
 
@@ -118,6 +126,8 @@ export default function Meetings() {
         }
     };
 
+    const nextMeetingSmartBadge = nextMeeting ? getSmartBadge(nextMeeting.meetingDate) : null;
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex items-center justify-between">
@@ -140,38 +150,57 @@ export default function Meetings() {
             )}
 
             {nextMeeting && (
-                <Card className="border-none shadow-lg bg-gradient-to-r from-stats-cyan to-blue-500 text-white overflow-hidden relative">
-                    <div className="absolute right-[-20px] top-[-20px] opacity-10">
-                        <Users size={160} />
+                <Card className={cn(
+                    "border-none shadow-lg text-white overflow-hidden relative",
+                    nextMeeting.type?.toLowerCase().includes('online')
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                        : "bg-gradient-to-r from-stats-cyan to-blue-500"
+                )}>
+                    <div className="absolute right-[-20px] top-[-10px] opacity-10">
+                        <Users size={120} />
                     </div>
-                    <CardHeader>
-                        <CardTitle className="text-sm font-bold uppercase tracking-widest text-white/70 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                            Próximo Encontro
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col md:flex-row justify-between gap-6">
-                            <div className="space-y-4">
-                                {nextMeeting.type && (
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-[-12px]">
-                                        {nextMeeting.type}
-                                    </p>
-                                )}
-                                <h2 className="text-4xl font-black">{(nextMeeting as any).title || "Reunião de Equipe"}</h2>
-                                <div className="flex flex-wrap gap-4 text-sm font-bold">
-                                    <span className="flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-full">
-                                        <MapPin size={16} /> {(nextMeeting as any).location || "Salão Paroquial"}
+                    <CardContent className="py-5 px-8">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                            <div className="space-y-1.5 min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-white/70">Próximo Encontro</p>
+                                </div>
+                                <h2 className="text-3xl font-black truncate">{(nextMeeting as any).title || "Reunião de Equipe"}</h2>
+                                <div className="flex flex-wrap gap-3 text-[11px] font-bold">
+                                    <span className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded-md backdrop-blur-sm">
+                                        {nextMeeting.type?.toLowerCase().includes('online') ? (
+                                            <Video size={12} className="text-emerald-300" />
+                                        ) : (
+                                            <MapPin size={12} className="text-emerald-300" />
+                                        )}
+                                        {(nextMeeting as any).location || "Salão Paroquial"}
                                     </span>
-                                    <span className="flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-full">
-                                        <Clock size={16} /> {(nextMeeting as any).meetingTime || "20:00"}
+                                    <span className="flex items-center gap-1.5 bg-white/10 px-2 py-1 rounded-md backdrop-blur-sm">
+                                        <Clock size={12} className="text-amber-300" /> {(nextMeeting as any).meetingTime || "20:00"}
                                     </span>
+                                    {nextMeetingSmartBadge && (
+                                        <span className={cn(
+                                            "flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg",
+                                            nextMeetingSmartBadge.variant === "today" && "bg-rose-500 text-white animate-pulse shadow-rose-500/50",
+                                            nextMeetingSmartBadge.variant === "tomorrow" && "bg-amber-400 text-white shadow-amber-400/50",
+                                            nextMeetingSmartBadge.variant === "countdown" && "bg-emerald-400 text-white shadow-emerald-400/50",
+                                            nextMeetingSmartBadge.variant === "default" && "bg-white/20 text-white"
+                                        )}>
+                                            {nextMeetingSmartBadge.text}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
-                            <div className="flex flex-col items-center justify-center bg-white/10 backdrop-blur-md rounded-2xl p-6 min-w-[140px] border border-white/20">
-                                <span className="text-sm font-bold text-white/60 mb-1 uppercase tracking-tighter">{formatDate(nextMeeting.meetingDate, "EEEE")}</span>
-                                <span className="text-5xl font-black">{formatDate(nextMeeting.meetingDate, "dd")}</span>
-                                <span className="text-xs font-bold text-white/60 mt-1 uppercase">{formatDate(nextMeeting.meetingDate, "MMMM")}</span>
+                            <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 shrink-0">
+                                <div className="text-center">
+                                    <span className="block text-[8px] font-black text-white/50 uppercase tracking-tighter leading-none mb-1">{formatDate(nextMeeting.meetingDate, "MMM")}</span>
+                                    <span className="block text-3xl font-black leading-none">{formatDate(nextMeeting.meetingDate, "dd")}</span>
+                                </div>
+                                <div className="w-[1px] h-10 bg-white/20" />
+                                <div className="text-xs font-bold text-white/80 uppercase">
+                                    {formatDate(nextMeeting.meetingDate, "EEEE")}
+                                </div>
                             </div>
                         </div>
                     </CardContent>
@@ -179,81 +208,82 @@ export default function Meetings() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-4">
-                    <h2 className="text-lg font-bold text-slate-700 px-1 uppercase tracking-widest text-xs">Histórico de Atas</h2>
+                <div className="lg:col-span-2 space-y-3">
+                    <h2 className="text-[10px] font-black text-slate-400 px-1 uppercase tracking-widest">Histórico de Atas</h2>
                     {sortedMeetings.map((meeting: any) => (
                         <Card key={meeting.id} className="border-none shadow-sm hover:shadow-md transition-all group overflow-hidden bg-white">
-                            <CardContent className="p-0">
-                                <div className="flex">
-                                    <div className="w-16 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-4">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase">{formatDate(meeting.meetingDate, "MMM")}</span>
-                                        <span className="text-xl font-black text-slate-700">{formatDate(meeting.meetingDate, "dd")}</span>
-                                    </div>
-                                    <div className="flex-1 p-5 flex items-center justify-between">
-                                        <div>
-                                            {meeting.type && (
-                                                <p className="text-[9px] font-black text-stats-cyan uppercase tracking-widest mb-0.5">
-                                                    {meeting.type}
-                                                </p>
-                                            )}
-                                            <h4 className="font-bold text-slate-800 leading-tight mb-1">{(meeting as any).title || "Reunião"}</h4>
-                                            <p className="text-[11px] text-slate-400 font-medium">
-                                                Responsável: <span className="text-slate-600 font-bold">{meeting.responsibleName || "Coordenação"}</span>
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {(isAdmin || isSecretary) && (
-                                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 text-slate-400 hover:bg-white hover:shadow-sm rounded-full"
-                                                            >
-                                                                <MoreHorizontal size={16} />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent
-                                                            align="end"
-                                                            className="w-40 rounded-2xl shadow-xl border-slate-100 p-1"
-                                                        >
-                                                            <DropdownMenuItem
-                                                                onClick={() => handleEdit(meeting)}
-                                                                className="gap-2 cursor-pointer font-medium py-2 rounded-xl focus:bg-stats-cyan/10"
-                                                            >
-                                                                <Edit size={14} />
-                                                                Editar
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() => handleDelete(meeting.id)}
-                                                                className="gap-2 cursor-pointer font-medium py-2 rounded-xl text-rose-600 focus:bg-rose-50"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                                Excluir
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
+                            <CardContent className="p-2">
+                                <div className="flex items-center justify-between p-3">
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="font-bold text-slate-700 text-base leading-tight truncate">
+                                            {(meeting as any).title || "Reunião"}
+                                        </h4>
+                                        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-1">
+                                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                <Calendar size={12} className="text-rose-500" />
+                                                {formatDate(meeting.meetingDate)}
+                                            </div>
+                                            {meeting.meetingTime && (
+                                                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                    <Clock size={12} className="text-amber-500" />
+                                                    {meeting.meetingTime}
                                                 </div>
                                             )}
-                                            <Button
-                                                variant="outline" size="sm"
-                                                disabled={!meeting.fileUrl}
-                                                onClick={() => {
-                                                    if (meeting.fileUrl) {
-                                                        window.open(meeting.fileUrl, '_blank');
-                                                    } else {
-                                                        toast.info("Esta reunião não possui ata vinculada.");
-                                                    }
-                                                }}
-                                                className={cn(
-                                                    "h-8 text-[10px] font-bold gap-2 rounded-lg border-slate-200",
-                                                    meeting.fileUrl ? "hover:border-stats-cyan hover:text-stats-cyan" : "opacity-30 cursor-not-allowed"
-                                                )}
-                                            >
-                                                <FileText size={14} /> VER ATA
-                                            </Button>
+                                            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                {meeting.type?.toLowerCase().includes('online') ? <Video size={12} className="text-emerald-500" /> : <MapPin size={12} className="text-emerald-500" />}
+                                                <span className="truncate max-w-[150px]">
+                                                    {meeting.location || (meeting.type?.toLowerCase().includes('online') ? "Online" : "Salão Paroquial")}
+                                                </span>
+                                            </div>
+                                            {(meeting.responsibleName || "Coordenação") && (
+                                                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                    <Users size={12} className="text-blue-400" />
+                                                    <span className="truncate">{(meeting.responsibleName || "Coordenação").toUpperCase()}</span>
+                                                </div>
+                                            )}
                                         </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {(isAdmin || isSecretary) && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button className="h-8 w-8 flex items-center justify-center text-slate-200 hover:text-slate-400 hover:bg-slate-50 rounded-full transition-all">
+                                                        <MoreHorizontal size={18} />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-40 rounded-xl shadow-xl border-slate-100 p-1">
+                                                    <DropdownMenuItem
+                                                        onSelect={() => handleEdit(meeting)}
+                                                        className="gap-2 focus:bg-stats-cyan/10 focus:text-stats-cyan rounded-lg text-xs font-bold text-slate-600 cursor-pointer"
+                                                    >
+                                                        <Edit size={12} /> Editar
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleDelete(meeting.id)}
+                                                        className="gap-2 focus:bg-rose-50 text-rose-500 rounded-lg text-xs font-bold"
+                                                    >
+                                                        <Trash2 size={12} /> Excluir
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
+
+                                        <button
+                                            disabled={!meeting.fileUrl}
+                                            onClick={() => {
+                                                if (meeting.fileUrl) window.open(meeting.fileUrl, '_blank');
+                                                else toast.info("Esta reunião não possui ata vinculada.");
+                                            }}
+                                            className={cn(
+                                                "h-10 w-10 flex items-center justify-center rounded-xl transition-all",
+                                                meeting.fileUrl
+                                                    ? "text-slate-300 hover:text-stats-cyan hover:bg-stats-cyan/5"
+                                                    : "text-slate-100"
+                                            )}
+                                            title={meeting.fileUrl ? "Ver Ata" : "Sem Ata"}
+                                        >
+                                            <FileText size={20} />
+                                        </button>
                                     </div>
                                 </div>
                             </CardContent>
@@ -276,47 +306,56 @@ export default function Meetings() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            {[
-                                { title: "Templates de Ata", category: "Template" },
-                                { title: "Guias & Manuais", category: "Guia" },
-                                { title: "Controles & Listas", category: "Controle" }
-                            ].map((group) => {
-                                const groupFiles = uploads.filter((f: any) => f.category === group.category);
-                                return (
+                            {(() => {
+                                const groups = [
+                                    { title: "Templates de Ata", category: "Template" },
+                                    { title: "Guias & Manuais", category: "Guia" },
+                                    { title: "Controles & Listas", category: "Controle" }
+                                ];
+
+                                const visibleGroups = groups.map(group => ({
+                                    ...group,
+                                    files: uploads.filter((f: any) => f.category === group.category)
+                                })).filter(group => group.files.length > 0);
+
+                                if (visibleGroups.length === 0) {
+                                    return (
+                                        <div className="py-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
+                                            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Nenhum arquivo disponível</p>
+                                        </div>
+                                    );
+                                }
+
+                                return visibleGroups.map((group) => (
                                     <div key={group.category} className="space-y-2">
                                         <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                             <div className="w-1 h-1 rounded-full bg-stats-orange" />
                                             {group.title}
                                         </h4>
-                                        <div className="space-y-1.5">
-                                            {groupFiles.map((file: any) => (
-                                                <div key={file.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl hover:bg-stats-cyan/5 group transition-colors border border-transparent hover:border-stats-cyan/20">
+                                        <div className="space-y-1">
+                                            {group.files.map((file: any) => (
+                                                <div key={file.id} className="flex items-center justify-between p-2 bg-slate-50 hover:bg-stats-cyan/5 group transition-colors rounded-lg border border-transparent hover:border-stats-cyan/10">
                                                     <div
                                                         onClick={() => window.open(file.url, '_blank')}
                                                         className="flex-1 cursor-pointer flex items-center gap-2 overflow-hidden"
                                                     >
                                                         <FileText size={12} className="text-slate-300 group-hover:text-stats-cyan shrink-0" />
-                                                        <span className="text-[11px] font-bold text-slate-600 group-hover:text-stats-cyan truncate">{file.name}</span>
+                                                        <span className="text-[10px] font-bold text-slate-600 group-hover:text-stats-cyan truncate">{file.name}</span>
                                                     </div>
                                                     {(isAdmin || isSecretary) && (
                                                         <button
                                                             onClick={() => handleDeleteUpload(file.id)}
-                                                            className="opacity-0 group-hover:opacity-100 p-1 text-rose-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                            className="opacity-0 group-hover:opacity-100 p-1 text-rose-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-all"
                                                         >
                                                             <Trash2 size={10} />
                                                         </button>
                                                     )}
                                                 </div>
                                             ))}
-                                            {groupFiles.length === 0 && (
-                                                <div className="p-2 border border-dashed border-slate-100 rounded-xl text-center">
-                                                    <span className="text-[9px] font-medium text-slate-300 italic">Vazio</span>
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
-                                );
-                            })}
+                                ));
+                            })()}
 
                             <div className="pt-4 border-t border-slate-100">
                                 <Label className="text-[10px] uppercase font-bold text-slate-400 mb-2 block">Novo Upload</Label>
@@ -377,15 +416,34 @@ export default function Meetings() {
                     if (!open) setSelectedMeeting(null);
                 }}
                 initialData={selectedMeeting}
-                onSubmit={async (data) => {
+                onSubmit={async (formData) => {
+                    // Sanitize and normalize data for backend
+                    const { id, responsibleName, ...cleanData } = formData;
+
+                    const payload = {
+                        ...cleanData,
+                        responsibleId: formData.responsibleId || null,
+                    };
+
                     if (selectedMeeting) {
-                        await updateMutation.mutateAsync({ id: selectedMeeting.id, ...data });
+                        try {
+                            await updateMutation.mutateAsync({
+                                id: Number(selectedMeeting.id),
+                                ...payload
+                            });
+                        } catch (e) {
+                            // Error is handled in mutation onError
+                        }
                     } else {
-                        await createMutation.mutateAsync(data);
+                        try {
+                            await createMutation.mutateAsync(payload);
+                        } catch (e) {
+                            // Error is handled in mutation onError
+                        }
                     }
                 }}
                 isLoading={createMutation.isPending || updateMutation.isPending}
             />
-        </div>
+        </div >
     );
 }

@@ -109,7 +109,6 @@ export function MeetingFormModal({
 
     const handleFormSubmit = async (data: any) => {
         await onSubmit(data);
-        onOpenChange(false);
     };
 
     return (
@@ -177,6 +176,21 @@ export function MeetingFormModal({
                             <Label htmlFor="meetingTime">Horário</Label>
                             <Input id="meetingTime" type="time" {...register("meetingTime")} />
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="location">Local</Label>
+                        <Input id="location" {...register("location")} placeholder="Ex: Salão Paroquial, Sala 2" />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="content">Pauta / Observações (Opcional)</Label>
+                        <textarea
+                            id="content"
+                            {...register("content")}
+                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            placeholder="Descreva brevemente os assuntos tratados..."
+                        />
                     </div>
 
                     {watch("type") === "Reunião Presencial (Administrativa)" && (

@@ -12,12 +12,12 @@ import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function Formation() {
-    const { isAdmin } = useRole();
+    const { isAdmin, isSecretary, isLoading: isRoleLoading } = useRole();
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedFormation, setSelectedFormation] = useState<any>(null);
     const utils = trpc.useUtils();
 
-    const { data: formationsResponse, isLoading } = trpc.formation.list.useQuery();
+    const { data: formationsResponse, isLoading: isDataLoading } = trpc.formation.list.useQuery();
     const formations = Array.isArray(formationsResponse) ? formationsResponse : [];
 
     const createMutation = trpc.formation.create.useMutation({
@@ -55,13 +55,15 @@ export default function Formation() {
         }
     };
 
+    const canManage = isAdmin || isSecretary;
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Encontro de Pais e Padrinhos</h1>
                 </div>
-                {isAdmin && (
+                {canManage && (
                     <Button onClick={() => { setSelectedFormation(null); setModalOpen(true); }} className="gap-2 bg-stats-cyan hover:bg-stats-cyan/90 shadow-md">
                         <Plus size={18} />
                         Novo Encontro
@@ -69,111 +71,108 @@ export default function Formation() {
                 )}
             </div>
 
-            {isLoading && (
+            {(isDataLoading || isRoleLoading) && (
                 <div className="flex justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-stats-green"></div>
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {formations.map((formation: any) => {
-                    return (
-                        <Card key={formation.id} className="border-none shadow-sm hover:shadow-xl transition-all group overflow-hidden bg-white h-full flex flex-col">
-                            <div className="h-32 bg-gradient-to-br from-stats-green/20 to-stats-cyan/20 flex items-center justify-center relative shrink-0">
-                                <BookOpen size={48} className="text-white/40 absolute group-hover:scale-110 transition-transform" />
-                                <div className="absolute top-4 left-4">
-                                    <Badge className="bg-white/80 text-stats-green backdrop-blur-sm border-none font-black text-[10px]">
-                                        {formatDate(formation.date)}
-                                    </Badge>
-                                </div>
-                            </div>
-                            <CardContent className="p-6 space-y-4 flex-1 flex flex-col">
-                                <div className="space-y-2 flex-1">
-                                    <h3 className="text-lg font-black text-gray-800 leading-tight group-hover:text-stats-green transition-colors">
-                                        {formation.title}
-                                    </h3>
-                                    <p className="text-xs text-gray-500 font-medium line-clamp-3 leading-relaxed">
-                                        {formation.content || "Nenhuma observação registrada para este encontro."}
-                                    </p>
-                                </div>
+            <div className="bg-white rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.02)] border border-slate-50 overflow-hidden">
+                {/* List Header */}
+                <div className="hidden md:grid grid-cols-[100px_1fr_300px_48px] items-center gap-4 px-6 py-2 border-b border-slate-50 bg-slate-50/50">
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Data</p>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Encontro & Detalhes</p>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Equipe Escalada</p>
+                    <div />
+                </div>
 
-                                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                                    <div className="flex flex-col gap-2 flex-1">
-                                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-                                            <Users size={12} className="text-slate-400" />
-                                            <span>Escala:</span>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1.5 min-h-[20px]">
-                                            {(() => {
-                                                const scaleValue = (formation as any).facilitator || "";
-                                                const names = String(scaleValue).split(/[;,]/).map(s => s.trim()).filter(Boolean);
+                <div className="divide-y divide-slate-50">
+                    {!isDataLoading && formations.map((formation: any) => {
+                        const facilitator = (formation as any).facilitator || "";
+                        const teamNames = String(facilitator).split(/[;,]/).map(s => s.trim()).filter(Boolean);
 
-                                                if (names.length === 0) {
-                                                    return (
-                                                        <span className="text-[10px] text-slate-400 font-medium italic">Sem escala definida</span>
-                                                    );
-                                                }
-
-                                                return names.map((name: string) => (
-                                                    <Badge
-                                                        key={name}
-                                                        variant="secondary"
-                                                        className="bg-stats-cyan/10 text-stats-cyan border-none px-2 py-0 h-5 text-[9px] font-black rounded-md"
-                                                    >
-                                                        {name}
-                                                    </Badge>
-                                                ));
-                                            })()}
-                                        </div>
+                        return (
+                            <div
+                                key={formation.id}
+                                className="group transition-all hover:bg-slate-50/50 flex flex-col md:grid md:grid-cols-[100px_1fr_300px_48px] md:items-center gap-2 md:gap-4 px-4 md:px-6 py-2 hover:shadow-[inset_4px_0_0_0_#0ea5e9] transition-all"
+                            >
+                                {/* Date Column */}
+                                <div className="flex items-center md:justify-center">
+                                    <div className="bg-slate-50 px-3 py-1 rounded-full border border-slate-100 flex items-center justify-center h-6">
+                                        <p className="text-[11px] font-black text-slate-600 tracking-tight leading-none">
+                                            {formatDate(formation.date)}
+                                        </p>
                                     </div>
+                                </div>
 
-                                    {isAdmin && (
-                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity pr-2">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-9 w-9 text-slate-400 hover:bg-white hover:shadow-sm rounded-full"
-                                                    >
-                                                        <MoreHorizontal size={18} />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-
-                                                <DropdownMenuContent
-                                                    align="end"
-                                                    className="w-40 rounded-2xl shadow-xl border-slate-100 p-1"
-                                                >
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleEdit(formation)}
-                                                        className="text-blue-600 gap-2 cursor-pointer font-medium py-2 rounded-xl focus:bg-blue-50"
-                                                    >
-                                                        <Pencil size={14} /> Editar
-                                                    </DropdownMenuItem>
-
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleDelete(formation.id)}
-                                                        className="text-rose-600 gap-2 cursor-pointer font-medium py-2 rounded-xl focus:bg-rose-50"
-                                                    >
-                                                        <Trash2 size={14} /> Excluir
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
+                                {/* Content Column */}
+                                <div className="space-y-0.5 min-w-0">
+                                    <h4 className="text-sm font-medium text-slate-600 truncate tracking-tight">
+                                        {formation.title}
+                                    </h4>
+                                    {formation.content && (
+                                        <p className="text-[10px] text-slate-400 truncate font-medium">
+                                            {formation.content}
+                                        </p>
                                     )}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    );
-                })}
-                {formations.length === 0 && (
-                    <div className="col-span-full py-20 text-center bg-slate-50/50 rounded-3xl border-2 border-dashed border-slate-200">
-                        <Lightbulb size={48} className="mx-auto mb-4 text-slate-200" />
-                        <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Nenhum encontro agendado</p>
-                    </div>
-                )}
-            </div>
 
+                                {/* Team Column */}
+                                <div className="flex flex-wrap md:justify-center items-center gap-1.5 md:border-l md:border-r md:border-slate-50 md:h-full py-1">
+                                    {teamNames.length > 0 ? (
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <Users size={12} className="text-slate-300 shrink-0" />
+                                            <p className="text-[11px] font-medium text-slate-500 leading-tight">
+                                                {teamNames.join(', ')}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] text-slate-300 font-bold italic tracking-tighter">Sem escala</span>
+                                    )}
+                                </div>
+
+                                {/* Actions Column */}
+                                <div className="flex justify-end md:justify-center">
+                                    {canManage && (
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <button className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-stats-cyan hover:bg-stats-cyan/5 rounded-xl transition-all">
+                                                    <MoreHorizontal size={14} />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-40 rounded-2xl shadow-xl border-slate-100 p-1">
+                                                <DropdownMenuItem
+                                                    onClick={() => handleEdit(formation)}
+                                                    className="gap-2 focus:bg-stats-cyan/10 focus:text-stats-cyan rounded-xl text-xs font-bold text-slate-600"
+                                                >
+                                                    <Pencil size={12} /> Editar
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => handleDelete(formation.id)}
+                                                    className="gap-2 focus:bg-rose-50 text-rose-500 rounded-xl text-xs font-bold"
+                                                >
+                                                    <Trash2 size={12} /> Remover
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {!isDataLoading && formations.length === 0 && (
+                        <div className="py-20 flex flex-col items-center justify-center space-y-4">
+                            <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200">
+                                <Users size={32} />
+                            </div>
+                            <div className="text-center">
+                                <p className="text-sm font-bold text-slate-400">Nenhum encontro agendado</p>
+                                <p className="text-xs text-slate-300">Tudo limpo por aqui</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
 
             <FormationFormModal
                 key={modalOpen ? (selectedFormation?.id || 'new') : 'closed'}

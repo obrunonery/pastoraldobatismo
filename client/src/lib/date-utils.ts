@@ -1,4 +1,4 @@
-import { format, parseISO, isValid } from "date-fns";
+import { format, parseISO, isValid, differenceInDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 /**
@@ -30,4 +30,25 @@ export function toInputDate(date: string | Date | null | undefined): string {
     const d = typeof date === "string" ? parseISO(date) : date;
     if (!isValid(d)) return "";
     return format(d, "yyyy-MM-dd");
+}
+
+/**
+ * Retorna um rótulo "inteligente" para o status baseado na proximidade da data.
+ */
+export function getSmartBadge(dateStr: string | Date | null | undefined, status?: string) {
+    if (!dateStr) return null;
+    const d = typeof dateStr === "string" ? parseISO(dateStr) : dateStr;
+    if (!isValid(d)) return null;
+
+    if (status?.toLowerCase() === "cancelado") return { text: "CANCELADO", variant: "canceled" };
+
+    const now = startOfDay(new Date());
+    const eventDate = startOfDay(d);
+    const diff = differenceInDays(eventDate, now);
+
+    if (diff === 0) return { text: "É HOJE!", variant: "today" };
+    if (diff === 1) return { text: "É AMANHÃ!", variant: "tomorrow" };
+    if (diff > 1 && diff <= 7) return { text: `Faltam ${diff} dias`, variant: "countdown", days: diff };
+
+    return status ? { text: status.toUpperCase(), variant: "default" } : null;
 }

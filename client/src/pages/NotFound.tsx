@@ -14,7 +14,7 @@ export default function NotFound() {
             </p>
             <Link href="/">
                 <Button className="bg-[#404e67] hover:bg-[#354054] px-8 py-6 h-auto text-lg rounded-xl shadow-lg border-b-4 border-black/20 transition-all active:border-b-0 active:translate-y-1">
-                    Voltar para o Dashboard
+                    Voltar para o Painel da Pastoral
                 </Button>
             </Link>
         </div>

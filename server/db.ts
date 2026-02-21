@@ -12,7 +12,7 @@ export const db = drizzle(client, { schema });
 
 // === Usuários / Perfil ===
 export async function upsertUser(user: any) {
-    const adminEmails = ["lbrunonery@gmail.com"];
+    const adminEmails = ["lbrunonery@gmail.com", "www.brunonery@gmail.com"];
     const isAdminEmail = user.email ? adminEmails.includes(user.email.toLowerCase()) : false;
 
     const roleMap: Record<string, any> = {
@@ -25,7 +25,10 @@ export async function upsertUser(user: any) {
         "CELEBRANTE": "CELEBRANTE"
     };
 
-    const finalRole = roleMap[user.role] ?? (isAdminEmail ? "ADMIN" : "MEMBER");
+    const existing = await getUserByClerkId(user.id);
+    const existingRole = existing?.role;
+
+    const finalRole = roleMap[user.role] ?? (existingRole ?? (isAdminEmail ? "ADMIN" : "MEMBER"));
 
     console.log("[DB] Upserting user:", user.email, "Final Role:", finalRole);
 
@@ -97,14 +100,113 @@ export async function updateGeneralEvent(id: number, data: any) {
     return await db.update(schema.events).set(data).where(eq(schema.events.id, id));
 }
 
+// === Agenda Unificada ===
+export async function listAllAgendaItems() {
+    const [events, meetingsRes, baptisms, formations] = await Promise.all([
+        db.select().from(schema.events).where(sql`status != 'Cancelado'`),
+        db.select({
+            id: schema.minutes.id,
+            meetingDate: schema.minutes.meetingDate,
+            meetingTime: schema.minutes.meetingTime,
+            title: schema.minutes.title,
+            type: schema.minutes.type,
+            location: schema.minutes.location,
+            responsibleName: schema.users.name,
+        }).from(schema.minutes).leftJoin(schema.users, eq(schema.minutes.responsibleId, schema.users.id)),
+        db.select().from(schema.baptisms).where(sql`scheduled_date IS NOT NULL AND status != 'Cancelado'`),
+        db.select().from(schema.formations)
+    ]);
+
+    const meetings = meetingsRes;
+
+    const mappedEvents = events.map(e => ({
+        id: `event-${e.id}`,
+        originalId: e.id,
+        title: e.title,
+        date: e.date,
+        time: e.time,
+        location: e.location,
+        type: 'Evento',
+        status: e.status
+    }));
+
+    const mappedMeetings = meetings.map(m => ({
+        id: `meeting-${m.id}`,
+        originalId: m.id,
+        title: m.title || "Reunião de Equipe",
+        date: m.meetingDate,
+        time: m.meetingTime,
+        location: m.location,
+        type: 'Reunião',
+        category: m.type,
+        responsibleName: m.responsibleName
+    }));
+
+    const mappedBaptisms = baptisms.map(b => ({
+        id: `baptism-${b.id}`,
+        originalId: b.id,
+        title: `Batismo: ${b.childName}`,
+        date: b.scheduledDate,
+        time: "09:00", // Default para batismos
+        location: "Igreja Matriz",
+        type: 'Batismo',
+        status: b.status
+    }));
+
+    const mappedFormations = formations.map(f => ({
+        id: `formation-${f.id}`,
+        originalId: f.id,
+        title: f.title,
+        date: f.date,
+        time: "19:30", // Default para formações
+        location: "Salão Paroquial",
+        type: 'Formação',
+        facilitator: f.facilitator || f.facilitator // Ensuring it's passed
+    }));
+
+    return [...mappedEvents, ...mappedMeetings, ...mappedBaptisms, ...mappedFormations].sort((a, b) =>
+        (a.date || "").localeCompare(b.date || "")
+    );
+}
+
 export async function deleteGeneralEvent(id: number) {
     return await db.delete(schema.events).where(eq(schema.events.id, id));
 }
 
 // === Batismos ===
 export async function listBaptisms() {
-    const result = await client.execute('SELECT * FROM baptisms ORDER BY id DESC');
-    return result.rows.map((row: any) => ({
+    const baptismsRes = await client.execute('SELECT * FROM baptisms ORDER BY id DESC');
+    const baptismIds = baptismsRes.rows.map(b => b.id);
+
+    if (baptismIds.length === 0) return [];
+
+    // Busca agentes escalados para esses batismos
+    const schedulesRes = await client.execute({
+        sql: `
+            SELECT 
+                s.baptism_id as baptismId,
+                u.id as userId,
+                u.name as userName,
+                u.role as userRole
+            FROM schedules s
+            INNER JOIN users u ON s.user_id = u.id
+            WHERE s.baptism_id IN (${baptismIds.map(() => '?').join(',')})
+        `,
+        args: baptismIds
+    });
+
+    const agentsMap: Record<number, any[]> = {};
+    schedulesRes.rows.forEach((row: any) => {
+        const bId = Number(row.baptismId);
+        if (!agentsMap[bId]) agentsMap[bId] = [];
+        agentsMap[bId].push({
+            id: row.userId,
+            name: row.userName,
+            role: row.userRole
+        });
+    });
+
+    return baptismsRes.rows.map((row: any) => ({
         id: row.id,
         childName: row.child_name || row.childName,
         parentNames: row.parent_names || row.parentNames,
@@ -118,7 +220,8 @@ export async function listBaptisms() {
         observations: row.observations,
         gender: row.gender,
         age: row.age,
-        city: row.city
+        city: row.city,
+        agents: agentsMap[Number(row.id)] || []
     }));
 }
 
@@ -262,12 +365,14 @@ export async function updateMeeting(id: number, data: any) {
     if (data.content !== undefined) cleanData.content = data.content;
     if (data.fileUrl !== undefined) cleanData.fileUrl = data.fileUrl;
 
-    console.log("[DB] Updating Meeting:", id, "CleanData:", JSON.stringify(cleanData));
+    console.log("[DB] UpdateMeeting - ID:", id, "CleanData:", JSON.stringify(cleanData));
 
     try {
-        return await db.update(schema.minutes).set(cleanData).where(eq(schema.minutes.id, id));
+        const result = await db.update(schema.minutes).set(cleanData).where(eq(schema.minutes.id, id));
+        console.log("[DB] UpdateMeeting Success! Result:", JSON.stringify(result));
+        return result;
     } catch (error) {
-        console.error("[DB] Error updating meeting:", error);
+        console.error("[DB] UpdateMeeting CRITICAL ERROR:", error);
         throw error;
     }
 }
@@ -368,23 +473,26 @@ export async function getDashboardSummary() {
     console.log(`[DASH_LOG] Ref Date: ${nowLocal}`);
 
     try {
-        const bapRes = await client.execute("SELECT * FROM baptisms");
-        const meetRes = await client.execute("SELECT * FROM minutes");
-        const eveRes = await client.execute("SELECT * FROM events");
-        const commRes = await client.execute("SELECT COUNT(*) as total FROM communications");
+        // Optimized queries: only fetch the NEXT item, ignoring 'Cancelado'
+        const [nextBapRes, nextMeetRes, nextEveRes, commRes] = await Promise.all([
+            client.execute({
+                sql: "SELECT id, child_name, scheduled_date, docs_ok FROM baptisms WHERE COALESCE(scheduled_date, date) >= ? AND status != 'Cancelado' ORDER BY COALESCE(scheduled_date, date) ASC LIMIT 1",
+                args: [nowLocal]
+            }),
+            client.execute({
+                sql: "SELECT id, title, meeting_date, location, meeting_time FROM minutes WHERE meeting_date >= ? ORDER BY meeting_date ASC LIMIT 1",
+                args: [nowLocal]
+            }),
+            client.execute({
+                sql: "SELECT id, title, date, location FROM events WHERE date >= ? AND status != 'Cancelado' ORDER BY date ASC LIMIT 1",
+                args: [nowLocal]
+            }),
+            client.execute("SELECT COUNT(*) as total FROM communications")
+        ]);
 
-        const getFirstFuture = (rows: any[], dateField: string, altDateField?: string) => {
-            return rows
-                .map(r => ({ ...r, _date: (r[dateField] || r[altDateField || ""] || r.date || "").split('T')[0] }))
-                .filter(r => r._date && r._date >= nowLocal)
-                .sort((a, b) => a._date.localeCompare(b._date))[0];
-        };
-
-        const nextBap = getFirstFuture(bapRes.rows, 'scheduled_date', 'scheduledDate');
-        const nextMeet = getFirstFuture(meetRes.rows, 'meeting_date', 'meetingDate');
-        const nextEve = getFirstFuture(eveRes.rows, 'date');
-
-        console.log(`[DASH_LOG] Found -> Bap: ${nextBap?._date}, Meet: ${nextMeet?._date}, Eve: ${nextEve?._date}`);
+        const nextBap = nextBapRes.rows[0];
+        const nextMeet = nextMeetRes.rows[0];
+        const nextEve = nextEveRes.rows[0];
 
         const notificationsCount = Number(commRes.rows[0]?.total ?? commRes.rows[0]?.TOTAL ?? 0);
 
@@ -392,20 +500,21 @@ export async function getDashboardSummary() {
             nextBaptism: nextBap ? {
                 id: Number(nextBap.id),
                 childName: nextBap.child_name || nextBap.childName || "Sem Nome",
-                date: nextBap._date,
+                date: String(nextBap.scheduled_date || nextBap.scheduledDate || "").split('T')[0],
                 docsOk: Boolean(nextBap.docs_ok || nextBap.docsOk)
             } : null,
             nextMeeting: nextMeet ? {
                 id: Number(nextMeet.id),
-                title: nextMeet.title || "Reunião Pastoral (DEBUG)",
-                meetingDate: nextMeet._date,
+                title: nextMeet.title || "Reunião Pastoral",
+                meetingDate: String(nextMeet.meeting_date || nextMeet.meetingDate || "").split('T')[0],
                 location: nextMeet.location,
-                meetingTime: nextMeet.meeting_time || nextMeet.meetingTime
+                meetingTime: nextMeet.meeting_time || nextMeet.meetingTime,
+                type: nextMeet.type
             } : null,
             nextEvent: nextEve ? {
                 id: Number(nextEve.id),
                 title: nextEve.title,
-                date: nextEve._date,
+                date: String(nextEve.date || "").split('T')[0],
                 location: nextEve.location
             } : null,
             notificationsCount
@@ -420,47 +529,50 @@ export async function getPresenceScale() {
     const now = new Date(new Date().getTime() - (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
     try {
-        const baptismsRes = await client.execute("SELECT * FROM baptisms");
-        const upcomingBaptisms = baptismsRes.rows
-            .map((b: any) => ({
-                ...b,
-                computedDate: (b.scheduled_date || b.scheduledDate || b.date || b.Date || "").split('T')[0]
-            }))
-            .filter((b: any) => b.computedDate && b.computedDate >= now)
-            .sort((a, b) => a.computedDate.localeCompare(b.computedDate));
+        // Optimized: fetching upcoming baptisms and their schedules with a join
+        const baptismsRes = await client.execute({
+            sql: "SELECT id, child_name, scheduled_date, docs_ok FROM baptisms WHERE COALESCE(scheduled_date, date) >= ? AND status != 'Cancelado' ORDER BY COALESCE(scheduled_date, date) ASC",
+            args: [now]
+        });
 
-        if (upcomingBaptisms.length === 0) return [];
+        if (baptismsRes.rows.length === 0) return [];
 
-        const results = [];
-        for (const baptism of upcomingBaptisms) {
-            const scaleResult = await client.execute({
-                sql: `
-                    SELECT 
-                        s.id,
-                        u.id as userId,
-                        u.name as userName,
-                        u.role as userRole,
-                        s.role as ceremonyRole,
-                        s.presence_status as presenceStatus
-                    FROM schedules s
-                    INNER JOIN users u ON s.user_id = u.id
-                    WHERE s.baptism_id = ?
-                `,
-                args: [baptism.id]
-            });
+        const baptismIds = baptismsRes.rows.map(b => b.id);
 
-            results.push({
-                baptism: {
-                    id: Number(baptism.id),
-                    childName: baptism.child_name || baptism.childName || "Sem Nome",
-                    date: baptism.computedDate,
-                    docsOk: Boolean(baptism.docs_ok || baptism.docsOk)
-                },
-                members: scaleResult.rows
-            });
-        }
+        // Single query for ALL schedules of these baptisms
+        const schedulesRes = await client.execute({
+            sql: `
+                SELECT 
+                    s.id,
+                    s.baptism_id,
+                    u.id as userId,
+                    u.name as userName,
+                    u.role as userRole,
+                    s.role as ceremonyRole,
+                    s.presence_status as presenceStatus
+                FROM schedules s
+                INNER JOIN users u ON s.user_id = u.id
+                WHERE s.baptism_id IN (${baptismIds.map(() => '?').join(',')})
+            `,
+            args: baptismIds
+        });
 
-        return results;
+        const schedulesMap: Record<number, any[]> = {};
+        schedulesRes.rows.forEach((row: any) => {
+            const bId = Number(row.baptism_id);
+            if (!schedulesMap[bId]) schedulesMap[bId] = [];
+            schedulesMap[bId].push(row);
+        });
+
+        return baptismsRes.rows.map((baptism: any) => ({
+            baptism: {
+                id: Number(baptism.id),
+                childName: baptism.child_name || baptism.childName || "Sem Nome",
+                date: String(baptism.scheduled_date || baptism.scheduledDate || "").split('T')[0],
+                docsOk: Boolean(baptism.docs_ok || baptism.docsOk)
+            },
+            members: schedulesMap[Number(baptism.id)] || []
+        }));
     } catch (error) {
         console.error("[SCALE_DEBUG] Error:", error);
         throw error;

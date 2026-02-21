@@ -17,7 +17,7 @@ import {
     ChevronRight,
     Wallet
 } from "lucide-react";
-import { UserButton } from "@clerk/clerk-react";
+import { useUser } from "@clerk/clerk-react";
 import { useRole } from "@/hooks/useRole";
 import { cn } from "@/lib/utils";
 
@@ -27,8 +27,8 @@ interface DashboardLayoutProps {
 
 const menuItems = [
     {
-        group: "Navigation", items: [
-            { title: "Dashboard", icon: LayoutDashboard, href: "/" },
+        group: "Dados Gerais", items: [
+            { title: "Painel da Pastoral", icon: LayoutDashboard, href: "/" },
             { title: "Agenda", icon: Calendar, href: "/agenda" },
         ]
     },
@@ -51,11 +51,17 @@ const menuItems = [
         group: "Financeiro", items: [
             { title: "Financeiro", icon: Wallet, href: "/finance" },
         ]
+    },
+    {
+        group: "Configurações", items: [
+            { title: "Configurações", icon: UserIcon, href: "/profile" },
+        ]
     }
 ];
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const [location] = useLocation();
+    const { user } = useUser();
     const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 1024);
     const { isAdmin, isSecretary, isLoading, role } = useRole();
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
@@ -101,12 +107,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 isMobile ? "fixed h-full shadow-2xl" : "relative",
                 sidebarOpen ? "translate-x-0 w-64" : (isMobile ? "-translate-x-full w-64" : "w-20")
             )}>
-                <div className="h-16 flex items-center px-6 gap-3 bg-[#354054]">
-                    <div className="w-10 h-10 flex items-center justify-center">
-                        <img src="/dove.png" alt="Logo" className="w-8 h-8 object-contain brightness-0 invert" />
-                    </div>
+                <div className="h-16 flex items-center px-4 gap-3 bg-[#354054]">
+                    <button
+                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                        className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors"
+                    >
+                        <Menu size={24} />
+                    </button>
                     {(sidebarOpen || (isMobile && sidebarOpen)) && (
-                        <span className="font-bold text-lg tracking-tight whitespace-nowrap">Pastoral do Batismo</span>
+                        <span className="font-bold text-lg tracking-tight whitespace-nowrap animate-in fade-in slide-in-from-left-2 duration-300">
+                            Pastoral do Batismo
+                        </span>
                     )}
                 </div>
 
@@ -152,15 +163,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 {/* Header */}
                 <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 flex-shrink-0 z-40">
                     <div className="flex items-center gap-2 sm:gap-4">
-                        <button
-                            onClick={() => setSidebarOpen(!sidebarOpen)}
-                            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
-                        >
-                            {isMobile ? <Menu className="w-5 h-5" /> : (sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />)}
-                        </button>
                         <div className="hidden md:flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-1.5 focus-within:ring-2 ring-stats-cyan/20 transition-all">
                             <Search className="w-4 h-4 text-gray-400" />
-                            <input type="text" placeholder="Search..." className="bg-transparent border-none text-sm outline-none w-48" />
+                            <input type="text" placeholder="Buscar..." className="bg-transparent border-none text-sm outline-none w-48" />
                         </div>
                     </div>
 
@@ -169,16 +174,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             <Bell className="w-5 h-5" />
                             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-stats-pink rounded-full border-2 border-white" />
                         </button>
-                        <div className="w-px h-6 bg-gray-200 mx-1 hidden sm:block" />
-                        <div className="flex items-center gap-3 pl-2 group cursor-pointer">
-                            <UserButton
-                                appearance={{
-                                    elements: {
-                                        userButtonAvatarBox: "w-8 h-8 sm:w-9 sm:h-9 rounded-lg border-2 border-stats-cyan"
-                                    }
-                                }}
-                            />
-                        </div>
                     </div>
                 </header>
 

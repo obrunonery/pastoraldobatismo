@@ -83,7 +83,7 @@ export const appRouter = router({
     // Agenda Router (Eventos Gerais)
     agenda: router({
         list: protectedProcedure.query(async () => {
-            return await db.listAgendaEvents();
+            return await db.listAllAgendaItems();
         }),
         create: protectedProcedure
             .input(z.object({
@@ -179,13 +179,13 @@ export const appRouter = router({
         create: protectedProcedure
             .input(z.object({
                 meetingDate: z.string(),
-                title: z.string().optional(),
-                type: z.string().optional(),
-                responsibleId: z.string().optional(),
-                location: z.string().optional(),
-                meetingTime: z.string().optional(),
-                content: z.string().optional(),
-                fileUrl: z.string().optional()
+                title: z.string().optional().nullable(),
+                type: z.string().optional().nullable(),
+                responsibleId: z.string().optional().nullable(),
+                location: z.string().optional().nullable(),
+                meetingTime: z.string().optional().nullable(),
+                content: z.string().optional().nullable(),
+                fileUrl: z.string().optional().nullable()
             }))
             .mutation(async ({ input, ctx }) => {
                 const authorId = ctx.user?.id || "anonymous";
@@ -194,14 +194,14 @@ export const appRouter = router({
         update: protectedProcedure
             .input(z.object({
                 id: z.number(),
-                meetingDate: z.string().optional(),
-                title: z.string().optional(),
-                type: z.string().optional(),
-                responsibleId: z.string().optional(),
-                location: z.string().optional(),
-                meetingTime: z.string().optional(),
-                content: z.string().optional(),
-                fileUrl: z.string().optional()
+                meetingDate: z.string().optional().nullable(),
+                title: z.string().optional().nullable(),
+                type: z.string().optional().nullable(),
+                responsibleId: z.string().optional().nullable(),
+                location: z.string().optional().nullable(),
+                meetingTime: z.string().optional().nullable(),
+                content: z.string().optional().nullable(),
+                fileUrl: z.string().optional().nullable()
             }))
             .mutation(async ({ input }) => {
                 const { id, ...data } = input;
@@ -434,29 +434,31 @@ export const appRouter = router({
             .input(
                 z.object({
                     name: z.string().min(1),
-                    role: z.enum(["membro", "secretario", "coordenador", "vice_coordenador", "voluntario", "financeiro"]),
+                    role: z.enum(["membro", "secretario", "coordenador", "vice_coordenador", "voluntario", "financeiro", "admin", "celebrante"]),
                     email: z.string().optional(),
-                    phone: z.string().optional(),
+                    phone: z.string().optional().nullable(),
                     status: z.enum(["ativo", "inativo"]).default("ativo"),
-                    address: z.string().optional(),
-                    birthDate: z.string().optional(),
-                    maritalStatus: z.string().optional(),
-                    spouseName: z.string().optional(),
-                    weddingDate: z.string().optional(),
+                    address: z.string().optional().nullable(),
+                    birthDate: z.string().optional().nullable(),
+                    maritalStatus: z.string().optional().nullable(),
+                    spouseName: z.string().optional().nullable(),
+                    weddingDate: z.string().optional().nullable(),
                     hasChildren: z.boolean().optional(),
-                    childrenData: z.string().optional(),
-                    sacraments: z.string().optional(),
-                    photoUrl: z.string().optional(),
+                    childrenData: z.string().optional().nullable(),
+                    sacraments: z.string().optional().nullable(),
+                    photoUrl: z.string().optional().nullable(),
                 })
             )
             .mutation(async ({ input }) => {
-                const roleMap: Record<string, "ADMIN" | "SECRETARY" | "FINANCE" | "MEMBER" | "COORDENADOR" | "VICE_COORDENADOR"> = {
+                const roleMap: Record<string, "ADMIN" | "SECRETARY" | "FINANCE" | "MEMBER" | "COORDENADOR" | "VICE_COORDENADOR" | "CELEBRANTE"> = {
                     "secretario": "SECRETARY",
                     "coordenador": "COORDENADOR",
                     "vice_coordenador": "VICE_COORDENADOR",
                     "financeiro": "FINANCE",
                     "membro": "MEMBER",
-                    "voluntario": "MEMBER"
+                    "voluntario": "MEMBER",
+                    "admin": "ADMIN",
+                    "celebrante": "CELEBRANTE"
                 };
                 const dbRole = roleMap[input.role] || "MEMBER";
 
@@ -471,31 +473,33 @@ export const appRouter = router({
             .input(z.object({
                 id: z.string(),
                 name: z.string().optional(),
-                role: z.enum(["membro", "secretario", "coordenador", "vice_coordenador", "voluntario", "financeiro"]).optional(),
+                role: z.enum(["membro", "secretario", "coordenador", "vice_coordenador", "voluntario", "financeiro", "admin", "celebrante"]).optional(),
                 email: z.string().optional(),
-                phone: z.string().optional(),
+                phone: z.string().optional().nullable(),
                 status: z.enum(["ativo", "inativo"]).optional(),
-                address: z.string().optional(),
-                birthDate: z.string().optional(),
-                maritalStatus: z.string().optional(),
-                spouseName: z.string().optional(),
-                weddingDate: z.string().optional(),
+                address: z.string().optional().nullable(),
+                birthDate: z.string().optional().nullable(),
+                maritalStatus: z.string().optional().nullable(),
+                spouseName: z.string().optional().nullable(),
+                weddingDate: z.string().optional().nullable(),
                 hasChildren: z.boolean().optional(),
-                childrenData: z.string().optional(),
-                sacraments: z.string().optional(),
-                photoUrl: z.string().optional(),
+                childrenData: z.string().optional().nullable(),
+                sacraments: z.string().optional().nullable(),
+                photoUrl: z.string().optional().nullable(),
             }))
             .mutation(async ({ input }) => {
                 const { id, ...data } = input;
                 const updateData: any = { ...data };
                 if (data.role) {
-                    const roleMap: Record<string, "ADMIN" | "SECRETARY" | "FINANCE" | "MEMBER" | "COORDENADOR" | "VICE_COORDENADOR"> = {
+                    const roleMap: Record<string, "ADMIN" | "SECRETARY" | "FINANCE" | "MEMBER" | "COORDENADOR" | "VICE_COORDENADOR" | "CELEBRANTE"> = {
                         "secretario": "SECRETARY",
                         "coordenador": "COORDENADOR",
                         "vice_coordenador": "VICE_COORDENADOR",
                         "financeiro": "FINANCE",
                         "membro": "MEMBER",
-                        "voluntario": "MEMBER"
+                        "voluntario": "MEMBER",
+                        "admin": "ADMIN",
+                        "celebrante": "CELEBRANTE"
                     };
                     updateData.role = roleMap[data.role] || "MEMBER";
                 }
