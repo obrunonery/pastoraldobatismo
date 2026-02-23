@@ -8,21 +8,23 @@ function isIpAddress(host: string) {
 }
 
 function isSecureRequest(req: Request) {
-    if (req.protocol === "https") return true;
+    // Usando cast para any para contornar discrepâncias de tipos do express no ambiente TS
+    const request = req as any;
+    if (request.protocol === "https") return true;
 
-    const forwardedProto = req.headers["x-forwarded-proto"];
+    const forwardedProto = request.headers?.["x-forwarded-proto"];
     if (!forwardedProto) return false;
 
     const protoList = Array.isArray(forwardedProto)
         ? forwardedProto
         : forwardedProto.split(",");
 
-    return protoList.some(proto => proto.trim().toLowerCase() === "https");
+    return protoList.some((proto: string) => proto.trim().toLowerCase() === "https");
 }
 
 export function getSessionCookieOptions(
     req: Request
-): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
+): any { // Relaxando o tipo para evitar o erro de restrição 'never' no Pick
     return {
         httpOnly: true,
         path: "/",

@@ -1,3 +1,4 @@
+import type { Request, Response } from "express";
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import * as schema from "../../drizzle/schema";
 
@@ -5,8 +6,8 @@ import * as schema from "../../drizzle/schema";
 type User = typeof schema.users.$inferSelect;
 
 export type TrpcContext = {
-    req: CreateExpressContextOptions["req"];
-    res: CreateExpressContextOptions["res"];
+    req: Request;
+    res: Response;
     user: User | null;
 };
 

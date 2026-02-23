@@ -15,7 +15,9 @@ export class SDKServer {
      * Clerk authenticateRequest exige uma URL absoluta no ambiente Node.
      */
     async authenticateRequest(req: ExpressRequest): Promise<typeof schema.users.$inferSelect> {
-        const authHeader = req.headers.authorization;
+        // Usando cast para any para garantir acesso às propriedades do Express que o TS está perdendo
+        const request = req as any;
+        const authHeader = request.headers?.authorization;
         const token = authHeader?.replace("Bearer ", "");
 
         if (!token) {
@@ -27,20 +29,20 @@ export class SDKServer {
             console.log("[SDK] Verifying token with Clerk...");
 
             // Clerk authenticateRequest exige uma URL absoluta no ambiente Node.
-            const protocol = req.headers['x-forwarded-proto'] || 'http';
-            const host = req.headers.host || 'localhost:5000';
+            const protocol = request.headers?.['x-forwarded-proto'] || 'http';
+            const host = request.headers?.host || 'localhost:5000';
 
             // Usamos originalUrl para garantir o path completo desde a raiz /api/trpc
-            let path = req.originalUrl || req.url;
+            let path = request.originalUrl || request.url || "/";
             if (!path.startsWith('/')) path = '/' + path;
 
             const fullUrl = `${protocol}://${host}${path}`;
             console.log("[SDK] Auth Request:", path);
 
-            // Simulamos o objeto Request que o Clerk espera (padrão Web standard)
-            const clerkRequest = new Request(fullUrl, {
-                headers: new Headers(req.headers as any),
-                method: req.method,
+            // Usamos o construtor global Request explicitamente
+            const clerkRequest = new globalThis.Request(fullUrl, {
+                headers: new Headers(request.headers as any),
+                method: request.method || "GET",
             });
 
             // Verifica o token com o Clerk usando o objeto Request absoluto

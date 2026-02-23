@@ -29,7 +29,9 @@
         "baseUrl": ".",
         "types": [
             "node",
-            "vite/client"
+            "vite/client",
+            "express",
+            "multer"
         ],
         "paths": {
             "@/*": [
