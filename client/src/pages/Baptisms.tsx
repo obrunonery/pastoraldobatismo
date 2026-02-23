@@ -38,6 +38,9 @@ export default function Baptisms() {
             toast.success("Batismo cadastrado!");
             utils.baptism.list.invalidate();
             setModalOpen(false);
+        },
+        onError: (error) => {
+            toast.error(`Erro ao cadastrar: ${error.message}`);
         }
     });
 
@@ -47,6 +50,9 @@ export default function Baptisms() {
             utils.baptism.list.invalidate();
             setModalOpen(false);
             setSelectedBaptism(null);
+        },
+        onError: (error) => {
+            toast.error(`Erro ao atualizar: ${error.message}`);
         }
     });
 
@@ -54,6 +60,9 @@ export default function Baptisms() {
         onSuccess: () => {
             toast.success("Registro de batismo removido.");
             utils.baptism.list.invalidate();
+        },
+        onError: (error) => {
+            toast.error(`Erro ao excluir: ${error.message}`);
         }
     });
 
@@ -70,6 +79,9 @@ export default function Baptisms() {
         onSuccess: () => {
             toast.success("Status atualizado!");
             utils.baptism.list.invalidate();
+        },
+        onError: (error) => {
+            toast.error(`Erro ao atualizar status: ${error.message}`);
         }
     });
 
@@ -129,6 +141,9 @@ export default function Baptisms() {
             toast.success("Meta atualizada com sucesso!");
             refetchGoal();
             setIsEditingGoal(false);
+        },
+        onError: (error) => {
+            toast.error(`Erro ao atualizar meta: ${error.message}`);
         }
     });
 
@@ -235,7 +250,11 @@ export default function Baptisms() {
                     <AnimatePresence mode="popLayout">
                         {baptisms.length > 0 ? (
                             baptisms
-                                .filter((b: any) => b.childName?.toLowerCase().includes(searchTerm.toLowerCase()))
+                                .filter((b: any) => {
+                                    const search = (searchTerm || "").trim().toLowerCase();
+                                    if (!search) return true;
+                                    return (b.childName || "").toLowerCase().includes(search);
+                                })
                                 .map((baptism: any) => (
                                     <motion.div
                                         key={baptism.id}

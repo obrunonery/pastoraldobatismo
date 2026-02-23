@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";
 import * as schema from "../drizzle/schema";
-import { eq, gte, asc, desc, sql, count } from "drizzle-orm";
+import { eq, gte, asc, desc, sql, count, inArray } from "drizzle-orm";
 
 const client = createClient({
     url: process.env.TURSO_URL!,
@@ -12,9 +12,6 @@ export const db = drizzle(client, { schema });
 
 // === Usuários / Perfil ===
 export async function upsertUser(user: any) {
-    const adminEmails = ["lbrunonery@gmail.com", "www.brunonery@gmail.com"];
-    const isAdminEmail = user.email ? adminEmails.includes(user.email.toLowerCase()) : false;
-
     const roleMap: Record<string, any> = {
         "ADMIN": "ADMIN",
         "SECRETARY": "SECRETARY",
@@ -28,7 +25,7 @@ export async function upsertUser(user: any) {
     const existing = await getUserByClerkId(user.id);
     const existingRole = existing?.role;
 
-    const finalRole = roleMap[user.role] ?? (existingRole ?? (isAdminEmail ? "ADMIN" : "MEMBER"));
+    const finalRole = roleMap[user.role] ?? (existingRole ?? "MEMBER");
 
     console.log("[DB] Upserting user:", user.email, "Final Role:", finalRole);
 
@@ -167,6 +164,7 @@ export async function deleteGeneralEvent(id: number) {
 // === Batismos ===
 export async function listBaptisms() {
     const baptisms = await db.select().from(schema.baptisms).orderBy(desc(schema.baptisms.id));
+    console.log("[DB] listBaptisms found:", baptisms.length, "records");
 
     if (baptisms.length === 0) return [];
 
@@ -184,7 +182,7 @@ export async function listBaptisms() {
     })
         .from(schema.schedules)
         .innerJoin(schema.users, eq(schema.schedules.userId, schema.users.id))
-        .where(sql`${schema.schedules.baptismId} IN (${sql.join(baptismIds, sql`, `)})`);
+        .where(inArray(schema.schedules.baptismId, baptismIds));
 
     const agentsMap: Record<number, any[]> = {};
     schedules.forEach((row: any) => {
@@ -200,7 +198,20 @@ export async function listBaptisms() {
     });
 
     return baptisms.map(row => ({
-        ...row,
+        id: row.id,
+        childName: row.childName,
+        parentNames: row.parentNames,
+        godparentsNames: row.godparentsNames,
+        status: row.status,
+        date: row.date,
+        scheduledDate: row.scheduledDate,
+        celebrantId: row.celebrantId,
+        courseDone: row.courseDone,
+        docsOk: row.docsOk,
+        observations: row.observations,
+        gender: row.gender,
+        age: row.age,
+        city: row.city,
         agents: agentsMap[row.id] || []
     }));
 }
@@ -493,7 +504,7 @@ export async function getPresenceScale() {
         })
             .from(schema.schedules)
             .innerJoin(schema.users, eq(schema.schedules.userId, schema.users.id))
-            .where(sql`${schema.schedules.baptismId} IN (${sql.join(baptismIds, sql`, `)})`);
+            .where(inArray(schema.schedules.baptismId, baptismIds));
 
         const schedulesMap: Record<number, any[]> = {};
         schedules.forEach((row: any) => {

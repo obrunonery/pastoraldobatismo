@@ -19,6 +19,8 @@ if (!CLERK_PUBLISHABLE_KEY) {
 
 const queryClient = new QueryClient();
 
+import { toast } from "sonner";
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
     if (!(error instanceof TRPCClientError)) return;
     if (typeof window === "undefined") return;
@@ -35,6 +37,9 @@ queryClient.getQueryCache().subscribe(event => {
         const error = event.query.state.error;
         redirectToLoginIfUnauthorized(error);
         console.error("[API Query Error]", error);
+        if (error instanceof TRPCClientError) {
+            toast.error(`Erro na busca: ${error.message}`);
+        }
     }
 });
 
@@ -52,6 +57,9 @@ queryClient.getMutationCache().subscribe(event => {
         const error = event.mutation.state.error;
         redirectToLoginIfUnauthorized(error);
         console.error("[API Mutation Error]", error);
+        if (error instanceof TRPCClientError) {
+            toast.error(`Erro ao salvar: ${error.message}`);
+        }
     }
 });
 

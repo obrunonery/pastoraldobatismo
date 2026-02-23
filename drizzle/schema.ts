@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 // Tabela de Usuários (Integrada com Clerk)
 export const users = sqliteTable("users", {
@@ -83,7 +84,7 @@ export const uploads = sqliteTable("uploads", {
     filename: text("filename").notNull(),
     url: text("url").notNull(),
     category: text("category").notNull().default("Template"), // Template, Guia, Manual, etc
-    createdAt: text("created_at").default("CURRENT_TIMESTAMP"),
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const formations = sqliteTable("formations", {
@@ -115,7 +116,7 @@ export const requests = sqliteTable("requests", {
     description: text("description"),
     status: text("status").notNull().default("Pendente"),
     authorId: text("author_id").references(() => users.id),
-    createdAt: text("created_at").default("CURRENT_TIMESTAMP"),
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Tabela de Comunicação
@@ -132,5 +133,5 @@ export const communications = sqliteTable("communications", {
 export const configs = sqliteTable("configs", {
     key: text("key").primaryKey(),
     value: text("value").notNull(),
-    updatedAt: text("updated_at").default("CURRENT_TIMESTAMP"),
+    updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });

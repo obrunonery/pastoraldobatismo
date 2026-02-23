@@ -66,6 +66,10 @@ export default function Meetings() {
         onSuccess: () => {
             toast.success("Registro de reunião removido.");
             utils.meeting.list.invalidate();
+        },
+        onError: (error) => {
+            console.error("[MEETINGS] Delete Error:", error);
+            toast.error("Erro ao excluir reunião: " + error.message);
         }
     });
 
@@ -73,6 +77,9 @@ export default function Meetings() {
         onSuccess: () => {
             utils.uploads.list.invalidate();
             toast.success("Arquivo adicionado com sucesso!");
+        },
+        onError: (error) => {
+            toast.error("Erro ao salvar arquivo: " + error.message);
         }
     });
 
@@ -80,6 +87,9 @@ export default function Meetings() {
         onSuccess: () => {
             utils.uploads.list.invalidate();
             toast.success("Arquivo removido.");
+        },
+        onError: (error) => {
+            toast.error("Erro ao remover arquivo: " + error.message);
         }
     });
 
