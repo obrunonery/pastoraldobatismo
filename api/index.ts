@@ -3,7 +3,6 @@ import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../server/routers";
 import { createContext } from "../server/_core/context";
-import type { Request, Response } from "express";
 
 // App Express exportado como serverless function para o Vercel
 const app = express();
@@ -20,8 +19,8 @@ app.use(
     })
 );
 
-// Rota de health check
-app.get("/api/health", (_req: Request, res: Response) => {
+// Health check
+app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", env: process.env.NODE_ENV });
 });
 
