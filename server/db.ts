@@ -168,7 +168,12 @@ export async function listBaptisms() {
 
     if (baptisms.length === 0) return [];
 
-    const baptismIds = baptisms.map(b => b.id);
+    const baptismIds = baptisms.map(b => b.id).filter(id => id !== undefined && id !== null);
+
+    if (baptismIds.length === 0) {
+        console.log("[DB] listBaptisms: No valid baptismIds to fetch schedules");
+        return baptisms.map(row => ({ ...row, agents: [] }));
+    }
 
     // Busca agentes escalados para esses batismos
     const schedules = await db.select({
@@ -491,7 +496,19 @@ export async function getPresenceScale() {
 
         if (baptisms.length === 0) return [];
 
-        const baptismIds = baptisms.map(b => b.id);
+        const baptismIds = baptisms.map(b => b.id).filter(id => id !== undefined && id !== null);
+
+        if (baptismIds.length === 0) {
+            return baptisms.map((baptism: any) => ({
+                baptism: {
+                    id: baptism.id,
+                    childName: baptism.childName || "Sem Nome",
+                    date: (baptism.scheduledDate || baptism.date || "").split('T')[0],
+                    docsOk: baptism.docsOk
+                },
+                members: []
+            }));
+        }
 
         const schedules = await db.select({
             id: schema.schedules.id,
