@@ -78,16 +78,7 @@ export async function deleteUser(id: string) {
 
 // === Agenda (Eventos Gerais) ===
 export async function listAgendaEvents() {
-    const result = await client.execute('SELECT * FROM events ORDER BY date ASC');
-    return result.rows.map((row: any) => ({
-        id: row.id,
-        title: row.title,
-        date: row.date,
-        time: row.time,
-        location: row.location,
-        description: row.description,
-        status: row.status
-    }));
+    return await db.select().from(schema.events).orderBy(asc(schema.events.date));
 }
 
 export const listGeneralEvents = listAgendaEvents;
@@ -175,53 +166,42 @@ export async function deleteGeneralEvent(id: number) {
 
 // === Batismos ===
 export async function listBaptisms() {
-    const baptismsRes = await client.execute('SELECT * FROM baptisms ORDER BY id DESC');
-    const baptismIds = baptismsRes.rows.map(b => b.id);
+    const baptisms = await db.select().from(schema.baptisms).orderBy(desc(schema.baptisms.id));
 
-    if (baptismIds.length === 0) return [];
+    if (baptisms.length === 0) return [];
+
+    const baptismIds = baptisms.map(b => b.id);
 
     // Busca agentes escalados para esses batismos
-    const schedulesRes = await client.execute({
-        sql: `
-            SELECT 
-                s.baptism_id as baptismId,
-                u.id as userId,
-                u.name as userName,
-                u.role as userRole
-            FROM schedules s
-            INNER JOIN users u ON s.user_id = u.id
-            WHERE s.baptism_id IN (${baptismIds.map(() => '?').join(',')})
-        `,
-        args: baptismIds
-    });
+    const schedules = await db.select({
+        id: schema.schedules.id,
+        baptismId: schema.schedules.baptismId,
+        userId: schema.users.id,
+        userName: schema.users.name,
+        userRole: schema.users.role,
+        ceremonyRole: schema.schedules.role,
+        presenceStatus: schema.schedules.presenceStatus
+    })
+        .from(schema.schedules)
+        .innerJoin(schema.users, eq(schema.schedules.userId, schema.users.id))
+        .where(sql`${schema.schedules.baptismId} IN (${sql.join(baptismIds, sql`, `)})`);
 
     const agentsMap: Record<number, any[]> = {};
-    schedulesRes.rows.forEach((row: any) => {
+    schedules.forEach((row: any) => {
         const bId = Number(row.baptismId);
         if (!agentsMap[bId]) agentsMap[bId] = [];
         agentsMap[bId].push({
             id: row.userId,
             name: row.userName,
-            role: row.userRole
+            role: row.userRole,
+            ceremonyRole: row.ceremonyRole,
+            presenceStatus: row.presenceStatus
         });
     });
 
-    return baptismsRes.rows.map((row: any) => ({
-        id: row.id,
-        childName: row.child_name || row.childName,
-        parentNames: row.parent_names || row.parentNames,
-        godparentsNames: row.godparents_names || row.godparentsNames,
-        status: row.status,
-        date: row.date,
-        scheduledDate: row.scheduled_date || row.scheduledDate,
-        celebrantId: row.celebrant_id || row.celebrantId,
-        courseDone: Boolean(row.course_done || row.courseDone),
-        docsOk: Boolean(row.docs_ok || row.docsOk),
-        observations: row.observations,
-        gender: row.gender,
-        age: row.age,
-        city: row.city,
-        agents: agentsMap[Number(row.id)] || []
+    return baptisms.map(row => ({
+        ...row,
+        agents: agentsMap[row.id] || []
     }));
 }
 
@@ -230,8 +210,12 @@ export async function createBaptism(data: any) {
 }
 
 export async function listUniqueCities() {
-    const result = await client.execute("SELECT DISTINCT city FROM baptisms WHERE city IS NOT NULL AND city != '' ORDER BY city ASC");
-    return result.rows.map((row: any) => row.city);
+    const result = await db.select({ city: schema.baptisms.city })
+        .from(schema.baptisms)
+        .where(sql`${schema.baptisms.city} IS NOT NULL AND ${schema.baptisms.city} != ''`)
+        .groupBy(schema.baptisms.city)
+        .orderBy(asc(schema.baptisms.city));
+    return result.map(row => row.city);
 }
 
 export async function updateBaptism(id: number, data: any) {
@@ -246,16 +230,7 @@ export async function deleteBaptism(id: number) {
 
 // === Financeiro ===
 export async function listTransactions() {
-    const result = await client.execute('SELECT * FROM finance ORDER BY date DESC');
-    return result.rows.map((row: any) => ({
-        id: row.id,
-        title: row.title,
-        date: row.date,
-        value: row.value,
-        type: row.type,
-        category: row.category,
-        description: row.description
-    }));
+    return await db.select().from(schema.finance).orderBy(desc(schema.finance.date));
 }
 
 export async function createTransaction(data: any) {
@@ -271,8 +246,7 @@ export async function deleteTransaction(id: number) {
 }
 
 export async function getFinanceBI() {
-    const result = await client.execute('SELECT * FROM finance ORDER BY date ASC');
-    const transactions = result.rows;
+    const transactions = await db.select().from(schema.finance).orderBy(asc(schema.finance.date));
 
     const monthlyData: Record<string, { entry: number, exit: number, balance: number }> = {};
     transactions.forEach(t => {
@@ -299,36 +273,21 @@ export async function getFinanceBI() {
 
 // === Atas de Reunião (Minutes) ===
 export async function listMeetings() {
-    const result = await client.execute(`
-        SELECT 
-            m.id,
-            m.meeting_date,
-            m.meeting_time,
-            m.title,
-            m.type,
-            m.responsible_id,
-            m.location,
-            m.content,
-            m.file_url,
-            m.author_id,
-            u.name as responsibleName 
-        FROM minutes m 
-        LEFT JOIN users u ON m.responsible_id = u.id 
-        ORDER BY m.meeting_date DESC
-    `);
-    return result.rows.map((row: any) => ({
-        id: row.id,
-        title: row.title,
-        type: row.type,
-        responsibleId: row.responsible_id || row.responsibleId,
-        responsibleName: row.responsibleName || "Coordenação",
-        meetingDate: row.meeting_date || row.meetingDate,
-        meetingTime: row.meeting_time || row.meetingTime,
-        location: row.location,
-        content: row.content,
-        participants: row.participants,
-        fileUrl: row.file_url || row.fileUrl
-    }));
+    return await db.select({
+        id: schema.minutes.id,
+        title: schema.minutes.title,
+        type: schema.minutes.type,
+        responsibleId: schema.minutes.responsibleId,
+        responsibleName: schema.users.name,
+        meetingDate: schema.minutes.meetingDate,
+        meetingTime: schema.minutes.meetingTime,
+        location: schema.minutes.location,
+        content: schema.minutes.content,
+        fileUrl: schema.minutes.fileUrl
+    })
+        .from(schema.minutes)
+        .leftJoin(schema.users, eq(schema.minutes.responsibleId, schema.users.id))
+        .orderBy(desc(schema.minutes.meetingDate));
 }
 
 export async function createMeeting(data: any) {
@@ -383,15 +342,7 @@ export async function deleteMeeting(id: number) {
 
 // === Arquivos & Templates (Uploads) ===
 export async function listUploads() {
-    const result = await client.execute('SELECT * FROM uploads ORDER BY created_at DESC');
-    return result.rows.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        filename: row.filename,
-        url: row.url,
-        category: row.category,
-        createdAt: row.created_at || row.createdAt
-    }));
+    return await db.select().from(schema.uploads).orderBy(desc(schema.uploads.createdAt));
 }
 
 export async function createUpload(data: any) {
@@ -404,16 +355,7 @@ export async function deleteUpload(id: number) {
 
 // === Formações ===
 export async function listFormations() {
-    // Força bruta: lendo diretamente as colunas como strings para ignorar qualquer mapeamento do driver/ORM
-    const result = await client.execute('SELECT id, title, date, content, file_url, facilitator FROM formations ORDER BY date DESC');
-    return result.rows.map((row: any) => ({
-        id: row['id'],
-        title: row['title'],
-        date: row['date'],
-        facilitator: row['facilitator'] || "",
-        content: row['content'] || "",
-        fileUrl: row['file_url'] || ""
-    }));
+    return await db.select().from(schema.formations).orderBy(desc(schema.formations.date));
 }
 
 export async function createFormation(data: any) {
@@ -470,54 +412,50 @@ export async function deleteCommunication(id: number) {
 // === Dashboard & BI Queries ===
 export async function getDashboardSummary() {
     const nowLocal = new Date(new Date().getTime() - (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
-    console.log(`[DASH_LOG] Ref Date: ${nowLocal}`);
 
     try {
-        // Optimized queries: only fetch the NEXT item, ignoring 'Cancelado'
-        const [nextBapRes, nextMeetRes, nextEveRes, commRes] = await Promise.all([
-            client.execute({
-                sql: "SELECT id, child_name, scheduled_date, docs_ok FROM baptisms WHERE COALESCE(scheduled_date, date) >= ? AND status != 'Cancelado' ORDER BY COALESCE(scheduled_date, date) ASC LIMIT 1",
-                args: [nowLocal]
-            }),
-            client.execute({
-                sql: "SELECT id, title, meeting_date, location, meeting_time FROM minutes WHERE meeting_date >= ? ORDER BY meeting_date ASC LIMIT 1",
-                args: [nowLocal]
-            }),
-            client.execute({
-                sql: "SELECT id, title, date, location FROM events WHERE date >= ? AND status != 'Cancelado' ORDER BY date ASC LIMIT 1",
-                args: [nowLocal]
-            }),
-            client.execute("SELECT COUNT(*) as total FROM communications")
-        ]);
+        const [nextBap] = await db.select()
+            .from(schema.baptisms)
+            .where(sql`COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date}) >= ${nowLocal} AND ${schema.baptisms.status} != 'Cancelado'`)
+            .orderBy(asc(sql`COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date})`))
+            .limit(1);
 
-        const nextBap = nextBapRes.rows[0];
-        const nextMeet = nextMeetRes.rows[0];
-        const nextEve = nextEveRes.rows[0];
+        const [nextMeet] = await db.select()
+            .from(schema.minutes)
+            .where(gte(schema.minutes.meetingDate, nowLocal))
+            .orderBy(asc(schema.minutes.meetingDate))
+            .limit(1);
 
-        const notificationsCount = Number(commRes.rows[0]?.total ?? commRes.rows[0]?.TOTAL ?? 0);
+        const [nextEve] = await db.select()
+            .from(schema.events)
+            .where(sql`${schema.events.date} >= ${nowLocal} AND ${schema.events.status} != 'Cancelado'`)
+            .orderBy(asc(schema.events.date))
+            .limit(1);
+
+        const commCount = await db.select({ total: count() }).from(schema.communications);
 
         return {
             nextBaptism: nextBap ? {
-                id: Number(nextBap.id),
-                childName: nextBap.child_name || nextBap.childName || "Sem Nome",
-                date: String(nextBap.scheduled_date || nextBap.scheduledDate || "").split('T')[0],
-                docsOk: Boolean(nextBap.docs_ok || nextBap.docsOk)
+                id: nextBap.id,
+                childName: nextBap.childName || "Sem Nome",
+                date: (nextBap.scheduledDate || nextBap.date || "").split('T')[0],
+                docsOk: nextBap.docsOk
             } : null,
             nextMeeting: nextMeet ? {
-                id: Number(nextMeet.id),
+                id: nextMeet.id,
                 title: nextMeet.title || "Reunião Pastoral",
-                meetingDate: String(nextMeet.meeting_date || nextMeet.meetingDate || "").split('T')[0],
+                meetingDate: (nextMeet.meetingDate || "").split('T')[0],
                 location: nextMeet.location,
-                meetingTime: nextMeet.meeting_time || nextMeet.meetingTime,
+                meetingTime: nextMeet.meetingTime,
                 type: nextMeet.type
             } : null,
             nextEvent: nextEve ? {
-                id: Number(nextEve.id),
+                id: nextEve.id,
                 title: nextEve.title,
-                date: String(nextEve.date || "").split('T')[0],
+                date: (nextEve.date || "").split('T')[0],
                 location: nextEve.location
             } : null,
-            notificationsCount
+            notificationsCount: commCount[0].total
         };
     } catch (error: any) {
         console.error("[DASH_LOG] Error:", error.message);
@@ -526,52 +464,52 @@ export async function getDashboardSummary() {
 }
 
 export async function getPresenceScale() {
-    const now = new Date(new Date().getTime() - (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
+    const nowLocal = new Date(new Date().getTime() - (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
     try {
-        // Optimized: fetching upcoming baptisms and their schedules with a join
-        const baptismsRes = await client.execute({
-            sql: "SELECT id, child_name, scheduled_date, docs_ok FROM baptisms WHERE COALESCE(scheduled_date, date) >= ? AND status != 'Cancelado' ORDER BY COALESCE(scheduled_date, date) ASC",
-            args: [now]
-        });
+        const baptisms = await db.select({
+            id: schema.baptisms.id,
+            childName: schema.baptisms.childName,
+            date: schema.baptisms.date,
+            scheduledDate: schema.baptisms.scheduledDate,
+            docsOk: schema.baptisms.docsOk
+        })
+            .from(schema.baptisms)
+            .where(sql`COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date}) >= ${nowLocal} AND ${schema.baptisms.status} != 'Cancelado'`)
+            .orderBy(asc(sql`COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date})`));
 
-        if (baptismsRes.rows.length === 0) return [];
+        if (baptisms.length === 0) return [];
 
-        const baptismIds = baptismsRes.rows.map(b => b.id);
+        const baptismIds = baptisms.map(b => b.id);
 
-        // Single query for ALL schedules of these baptisms
-        const schedulesRes = await client.execute({
-            sql: `
-                SELECT 
-                    s.id,
-                    s.baptism_id,
-                    u.id as userId,
-                    u.name as userName,
-                    u.role as userRole,
-                    s.role as ceremonyRole,
-                    s.presence_status as presenceStatus
-                FROM schedules s
-                INNER JOIN users u ON s.user_id = u.id
-                WHERE s.baptism_id IN (${baptismIds.map(() => '?').join(',')})
-            `,
-            args: baptismIds
-        });
+        const schedules = await db.select({
+            id: schema.schedules.id,
+            baptismId: schema.schedules.baptismId,
+            userId: schema.users.id,
+            userName: schema.users.name,
+            userRole: schema.users.role,
+            ceremonyRole: schema.schedules.role,
+            presenceStatus: schema.schedules.presenceStatus
+        })
+            .from(schema.schedules)
+            .innerJoin(schema.users, eq(schema.schedules.userId, schema.users.id))
+            .where(sql`${schema.schedules.baptismId} IN (${sql.join(baptismIds, sql`, `)})`);
 
         const schedulesMap: Record<number, any[]> = {};
-        schedulesRes.rows.forEach((row: any) => {
-            const bId = Number(row.baptism_id);
+        schedules.forEach((row: any) => {
+            const bId = Number(row.baptismId);
             if (!schedulesMap[bId]) schedulesMap[bId] = [];
             schedulesMap[bId].push(row);
         });
 
-        return baptismsRes.rows.map((baptism: any) => ({
+        return baptisms.map((baptism: any) => ({
             baptism: {
-                id: Number(baptism.id),
-                childName: baptism.child_name || baptism.childName || "Sem Nome",
-                date: String(baptism.scheduled_date || baptism.scheduledDate || "").split('T')[0],
-                docsOk: Boolean(baptism.docs_ok || baptism.docsOk)
+                id: baptism.id,
+                childName: baptism.childName || "Sem Nome",
+                date: (baptism.scheduledDate || baptism.date || "").split('T')[0],
+                docsOk: baptism.docsOk
             },
-            members: schedulesMap[Number(baptism.id)] || []
+            members: schedulesMap[baptism.id] || []
         }));
     } catch (error) {
         console.error("[SCALE_DEBUG] Error:", error);
@@ -597,58 +535,50 @@ export async function removeFromScale(scheduleId: number) {
 }
 
 export async function getEvolutionData(filters?: { gender?: string, city?: string, year?: string, ageGroup?: string }) {
-    let query = `
-        SELECT
-            strftime('%m', COALESCE(scheduled_date, date)) as month_num,
-            strftime('%Y', COALESCE(scheduled_date, date)) as year_num,
-            COUNT(*) as count
-        FROM baptisms
-        WHERE 1=1
-    `;
-    const args: any[] = [];
+    const whereConditions = [];
+
+    // Filter out records from before 2026 (start of the project) as per user request
+    const startYear = filters?.year || "2026";
+    whereConditions.push(sql`strftime('%Y', COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date})) = ${startYear}`);
 
     if (filters?.ageGroup === "child") {
-        query += ` AND (age = 0 OR age IS NULL) `;
+        whereConditions.push(sql`(${schema.baptisms.age} = 0 OR ${schema.baptisms.age} IS NULL)`);
     } else if (filters?.ageGroup === "adult") {
-        query += ` AND age = 1 `;
+        whereConditions.push(sql`${schema.baptisms.age} = 1`);
     }
 
     if (filters?.gender) {
-        query += ` AND gender = ? `;
-        args.push(filters.gender);
+        whereConditions.push(eq(schema.baptisms.gender, filters.gender as any));
     }
     if (filters?.city) {
-        query += ` AND city = ? `;
-        args.push(filters.city);
+        whereConditions.push(eq(schema.baptisms.city, filters.city));
     }
 
-    if (filters?.year) {
-        query += ` AND strftime('%Y', COALESCE(scheduled_date, date)) = ? `;
-        args.push(filters.year);
-    } else {
-        // Filter out records from before 2026 (start of the project) as per user request
-        query += ` AND strftime('%Y', COALESCE(scheduled_date, date)) >= '2026' `;
-    }
-
-    query += ` GROUP BY year_num, month_num ORDER BY year_num ASC, month_num ASC `;
-
-    console.log("[EVOLUTION_DEBUG] Query:", query);
-    console.log("[EVOLUTION_DEBUG] Args:", args);
-
-    const result = await client.execute({ sql: query, args });
-    const rows = result.rows;
-
-    console.log("[EVOLUTION_DEBUG] Result Rows:", rows.length);
+    const result = await db.select({
+        monthNum: sql<string>`strftime('%m', COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date}))`,
+        yearNum: sql<string>`strftime('%Y', COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date}))`,
+        count: count()
+    })
+        .from(schema.baptisms)
+        .where(sql.join(whereConditions, sql` AND `))
+        .groupBy(
+            sql`strftime('%Y', COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date}))`,
+            sql`strftime('%m', COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date}))`
+        )
+        .orderBy(
+            asc(sql`strftime('%Y', COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date}))`),
+            asc(sql`strftime('%m', COALESCE(${schema.baptisms.scheduledDate}, ${schema.baptisms.date}))`)
+        );
 
     const monthsMap: Record<string, string> = {
         '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr', '05': 'Mai', '06': 'Jun',
         '07': 'Jul', '08': 'Ago', '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
     };
 
-    return rows.map((row: any) => ({
-        name: `${monthsMap[row.month_num]} ${row.year_num.slice(2)}`,
+    return result.map((row: any) => ({
+        name: `${monthsMap[row.monthNum]} ${row.yearNum.slice(2)}`,
         quantity: row.count,
-        year: Number(row.year_num)
+        year: Number(row.yearNum)
     }));
 }
 

@@ -20,9 +20,8 @@ import { X } from "lucide-react";
 import {
     SignedIn,
     SignedOut,
-    SignIn,
-    SignUp,
-    useUser
+    useUser,
+    AuthenticateWithRedirectCallback
 } from "@clerk/clerk-react";
 import React, { useEffect } from "react";
 import { trpc } from "@/lib/trpc";
@@ -141,6 +140,7 @@ function App() {
                     </SignedIn>
                     <SignedOut>
                         <Switch>
+                            <Route path="/sso-callback" component={AuthenticateWithRedirectCallback} />
                             <Route path="/login" component={Login} />
                             <Route>
                                 <Login />
