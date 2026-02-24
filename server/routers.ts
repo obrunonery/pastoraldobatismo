@@ -1,7 +1,7 @@
-import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
+import { systemRouter } from "./_core/systemRouter.js";
+import { publicProcedure, router, protectedProcedure } from "./_core/trpc.js";
 import { z } from "zod";
-import * as db from "./db";
+import * as db from "./db.js";
 
 export const appRouter = router({
     system: systemRouter,

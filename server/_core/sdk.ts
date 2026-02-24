@@ -1,8 +1,8 @@
 import { createClerkClient } from "@clerk/backend";
 import { Request as ExpressRequest } from "express";
-import * as db from "../db";
-import * as schema from "../../drizzle/schema";
-import { ForbiddenError } from "../../shared/_core/errors";
+import * as db from "../db.js";
+import * as schema from "../../drizzle/schema.js";
+import { ForbiddenError } from "../../shared/_core/errors.js";
 
 const clerk = createClerkClient({
     secretKey: process.env.CLERK_SECRET_KEY,

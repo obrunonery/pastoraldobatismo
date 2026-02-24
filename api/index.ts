@@ -17,8 +17,8 @@ app.use(
     "/api/trpc",
     async (req, res, next) => {
         try {
-            const { appRouter: router } = await import("../server/routers");
-            const { createContext: context } = await import("../server/_core/context");
+            const { appRouter: router } = await import("../server/routers.js");
+            const { createContext: context } = await import("../server/_core/context.js");
             return createExpressMiddleware({
                 router,
                 createContext: context,
@@ -51,7 +51,7 @@ app.get("/api/minimal-diag", (_req, res) => {
 // Diagnostic Endpoint
 app.get("/api/diag", async (_req, res) => {
     try {
-        const { db: database } = await import("../server/db");
+        const { db: database } = await import("../server/db.js");
         // Test basic query
         const result = await database.execute(sql`SELECT 1 as test`);
         res.json({
