@@ -1,3 +1,4 @@
+console.log("[VERCEL] api/index.ts loading...");
 import "dotenv/config";
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";

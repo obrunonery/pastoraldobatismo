@@ -3,8 +3,13 @@ import { createClient } from "@libsql/client";
 import * as schema from "../drizzle/schema";
 import { eq, gte, asc, desc, sql, count, inArray } from "drizzle-orm";
 
+const url = process.env.TURSO_URL;
+if (!url) {
+    console.error("[DB] CRITICAL ERROR: TURSO_URL is not defined! The application will crash on first query.");
+}
+
 const client = createClient({
-    url: process.env.TURSO_URL!,
+    url: url || "libsql://missing-url-check-env-vars.invalid",
     authToken: process.env.TURSO_AUTH_DATABASE,
 });
 
