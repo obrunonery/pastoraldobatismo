@@ -97,6 +97,20 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`\n\n[Server] 🚀 APLICAÇÃO RODANDO EM: http://localhost:${port}/ \n\n`);
   });
+
+  // Global Error Handler (MUST BE LAST)
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("[EXPRESS GLOBAL ERROR HANDLER]");
+    console.error(err); // Full stack trace
+
+    const status = err.statusCode || err.status || 500;
+    res.status(status).json({
+      error: true,
+      message: err.message || "Erro interno do servidor",
+      code: err.code || "INTERNAL_ERROR",
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+    });
+  });
 }
 
 startServer().catch(console.error);
