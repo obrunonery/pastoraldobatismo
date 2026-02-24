@@ -3,8 +3,8 @@ import "dotenv/config";
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { sql } from "drizzle-orm";
-import { appRouter } from "../server/routers";
-import { createContext } from "../server/_core/context";
+// import { appRouter } from "../server/routers";
+// import { createContext } from "../server/_core/context";
 
 // App Express exportado como serverless function para o Vercel
 const app = express();
@@ -15,14 +15,38 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 // tRPC API
 app.use(
     "/api/trpc",
-    createExpressMiddleware({
-        router: appRouter,
-        createContext,
-        onError({ error, path }) {
-            console.error(`[tRPC Error] Path: ${path}`, error);
-        },
-    })
+    async (req, res, next) => {
+        try {
+            const { appRouter: router } = await import("../server/routers");
+            const { createContext: context } = await import("../server/_core/context");
+            return createExpressMiddleware({
+                router,
+                createContext: context,
+                onError({ error, path }) {
+                    console.error(`[tRPC Error] Path: ${path}`, error);
+                },
+            })(req, res, next);
+        } catch (err: any) {
+            console.error("[TRPC BUNDLE/IMPORT ERROR]", err);
+            res.status(500).json({
+                error: true,
+                message: "Falha ao carregar o roteador do servidor",
+                details: err.message,
+                stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+            });
+        }
+    }
 );
+
+// Ultra-minimal Diagnostic (No DB, No Auth)
+app.get("/api/minimal-diag", (_req, res) => {
+    res.json({
+        status: "ok",
+        message: "Express is running",
+        node: process.version,
+        time: new Date().toISOString()
+    });
+});
 
 // Diagnostic Endpoint
 app.get("/api/diag", async (_req, res) => {
