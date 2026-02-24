@@ -1,20 +1,26 @@
-import dotenv from "dotenv";
-dotenv.config();
+import "dotenv/config";
 import { createClient } from "@libsql/client";
 
-async function run() {
-    const url = process.env.TURSO_URL;
-    const token = process.env.TURSO_AUTH_DATABASE;
-    console.log("URL:", url);
-    console.log("TOKEN_LENGTH:", token?.length);
+async function test() {
+    console.log("URL:", process.env.TURSO_URL);
+    console.log("TOKEN_LENGTH:", process.env.TURSO_AUTH_DATABASE?.length);
+
+    if (!process.env.TURSO_URL || !process.env.TURSO_AUTH_DATABASE) {
+        console.error("ERRO: Variáveis de ambiente faltando!");
+        process.exit(1);
+    }
+
+    const client = createClient({
+        url: process.env.TURSO_URL,
+        authToken: process.env.TURSO_AUTH_DATABASE,
+    });
 
     try {
-        const client = createClient({ url: url!, authToken: token });
         const res = await client.execute("SELECT 1");
         console.log("SUCCESS:", res.rows[0]);
     } catch (e) {
-        console.error("FAIL:", e);
+        console.error("FAILURE:", e);
     }
 }
 
-run();
+test().catch(console.error);

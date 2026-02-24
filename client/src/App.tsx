@@ -105,28 +105,6 @@ function Router() {
 
 function App() {
     const { user, isLoaded } = useUser();
-    const utils = trpc.useUtils();
-    const syncUser = trpc.auth.syncUser.useMutation({
-        onSuccess: () => {
-            console.log("[App] Sync success, invalidating profile...");
-            utils.auth.getProfile.invalidate();
-        },
-        onError: (err) => {
-            console.error("[App] Sync failed:", err);
-        }
-    });
-
-    useEffect(() => {
-        // Só sincroniza se estiver carregado, tiver usuário e NÃO estiver pendente nem tiver tido erro/sucesso nessa sessão
-        if (isLoaded && user && !syncUser.isPending && !syncUser.isSuccess && !syncUser.isError) {
-            console.log("[App] Effect: Syncing user data for", user.id);
-            syncUser.mutate({
-                id: user.id,
-                name: user.fullName || user.username || "Usuário",
-                email: user.primaryEmailAddress?.emailAddress || "",
-            });
-        }
-    }, [isLoaded, user, syncUser.isPending, syncUser.isSuccess, syncUser.isError]);
 
     console.log("[App] Rendering state:", { isLoaded, isSignedIn: !!user });
 
@@ -140,7 +118,9 @@ function App() {
                     </SignedIn>
                     <SignedOut>
                         <Switch>
-                            <Route path="/sso-callback" component={AuthenticateWithRedirectCallback} />
+                            <Route path="/sso-callback">
+                                <AuthenticateWithRedirectCallback />
+                            </Route>
                             <Route path="/login" component={Login} />
                             <Route>
                                 <Login />

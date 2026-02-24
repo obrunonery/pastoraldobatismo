@@ -39,9 +39,17 @@ export class SDKServer {
             const fullUrl = `${protocol}://${host}${path}`;
             console.log("[SDK] Auth Request:", path);
 
-            // Usamos o construtor global Request explicitamente
-            const clerkRequest = new globalThis.Request(fullUrl, {
-                headers: new Headers(request.headers as any),
+            // Ensure Request and Headers are available (Standard in Node 18+, but safe-check for Vercel)
+            const RequestClass = (globalThis as any).Request || (req as any).constructor;
+            const HeadersClass = (globalThis as any).Headers;
+
+            if (!RequestClass || !HeadersClass) {
+                console.error("[SDK] CRITICAL: global Request or Headers missing! Node version:", process.version);
+                throw new Error("Ambiente incompatível: Request ou Headers não encontrados.");
+            }
+
+            const clerkRequest = new RequestClass(fullUrl, {
+                headers: new HeadersClass(request.headers as any),
                 method: request.method || "GET",
             });
 
