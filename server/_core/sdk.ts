@@ -58,9 +58,7 @@ export class SDKServer {
             });
 
             // Verifica o token com o Clerk usando o objeto Request absoluto
-            const verifiedToken = await clerk.authenticateRequest(clerkRequest, {
-                jwtKey: process.env.CLERK_JWT_KEY,
-            });
+            const verifiedToken = await clerk.authenticateRequest(clerkRequest);
 
             if (!verifiedToken.isSignedIn) {
                 console.log("[SDK] Clerk session invalid");
