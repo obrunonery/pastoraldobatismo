@@ -38,6 +38,16 @@ app.use(
     }
 );
 
+// Basic Connectivity Test
+app.get("/api/ping", (_req, res) => {
+    res.json({
+        ok: true,
+        message: "Pong",
+        timestamp: new Date().toISOString(),
+        env: process.env.NODE_ENV
+    });
+});
+
 // Ultra-minimal Diagnostic (No DB, No Auth)
 app.get("/api/minimal-diag", (_req, res) => {
     res.json({

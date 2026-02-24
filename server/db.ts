@@ -608,11 +608,15 @@ export async function getEvolutionData(filters?: { gender?: string, city?: strin
         '07': 'Jul', '08': 'Ago', '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
     };
 
-    return result.map((row: any) => ({
-        name: `${monthsMap[row.monthNum]} ${row.yearNum.slice(2)}`,
-        quantity: row.count,
-        year: Number(row.yearNum)
-    }));
+    return result.map((row: any) => {
+        const month = monthsMap[row.monthNum] || 'Desconhecido';
+        const year = row.yearNum ? row.yearNum.slice(2) : '??';
+        return {
+            name: `${month} ${year}`,
+            quantity: row.count,
+            year: row.yearNum ? Number(row.yearNum) : 0
+        };
+    });
 }
 
 // === Configurações ===
