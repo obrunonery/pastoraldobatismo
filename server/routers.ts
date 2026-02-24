@@ -1,5 +1,3 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
@@ -17,12 +15,21 @@ export const appRouter = router({
                 phone: z.string().optional(),
             }))
             .mutation(async ({ input }) => {
-                return await db.upsertUser({
-                    id: input.id,
-                    name: input.name,
-                    email: input.email,
-                    phone: input.phone,
-                });
+                console.log("[TRPC] syncUser starting for:", input.email);
+                try {
+                    const result = await db.upsertUser({
+                        id: input.id,
+                        name: input.name,
+                        email: input.email,
+                        phone: input.phone,
+                    });
+                    console.log("[TRPC] syncUser success for:", input.email);
+                    return result;
+                } catch (error) {
+                    console.error("[TRPC] syncUser FATAL ERROR for:", input.email);
+                    console.error(error);
+                    throw error;
+                }
             }),
         getProfile: publicProcedure
             .input(z.object({ id: z.string() }))
@@ -35,13 +42,6 @@ export const appRouter = router({
                 }
                 return user;
             }),
-        logout: publicProcedure.mutation(({ ctx }) => {
-            const cookieOptions = getSessionCookieOptions(ctx.req);
-            ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-            return {
-                success: true,
-            } as const;
-        }),
     }),
 
     // Finance Router

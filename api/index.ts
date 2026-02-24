@@ -24,4 +24,18 @@ app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", env: process.env.NODE_ENV });
 });
 
+// Global Error Handler (CRITICAL for Vercel JSON responses)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("[VERCEL GLOBAL ERROR]");
+    console.error(err);
+
+    const status = err.statusCode || err.status || 500;
+    res.status(status).json({
+        error: true,
+        message: err.message || "Internal Server Error",
+        code: err.code || "INTERNAL_ERROR",
+        stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+    });
+});
+
 export default app;
