@@ -4,9 +4,12 @@ import * as db from "../db.js";
 import * as schema from "../../drizzle/schema.js";
 import { ForbiddenError } from "../../shared/_core/errors.js";
 
+if (!process.env.CLERK_SECRET_KEY) {
+    console.error("[SDK] CRITICAL: CLERK_SECRET_KEY is missing!");
+}
+
 const clerk = createClerkClient({
-    secretKey: process.env.CLERK_SECRET_KEY,
-    publishableKey: process.env.CLERK_PUBLISHABLE_KEY
+    secretKey: process.env.CLERK_SECRET_KEY || "",
 });
 
 export class SDKServer {
@@ -39,17 +42,18 @@ export class SDKServer {
             const fullUrl = `${protocol}://${host}${path}`;
             console.log("[SDK] Auth Request:", path);
 
-            // Ensure Request and Headers are available (Standard in Node 18+, but safe-check for Vercel)
-            const RequestClass = (globalThis as any).Request || (req as any).constructor;
-            const HeadersClass = (globalThis as any).Headers;
+            // In standard Node 18+ (Vercel), Request and Headers are global.
+            // We use the global constructors to create a Request object for Clerk.
+            const RequestConstructor = globalThis.Request;
+            const HeadersConstructor = globalThis.Headers;
 
-            if (!RequestClass || !HeadersClass) {
-                console.error("[SDK] CRITICAL: global Request or Headers missing! Node version:", process.version);
+            if (!RequestConstructor || !HeadersConstructor) {
+                console.error("[SDK] CRITICAL: Global Request or Headers missing! Node version:", process.version);
                 throw new Error("Ambiente incompatível: Request ou Headers não encontrados.");
             }
 
-            const clerkRequest = new RequestClass(fullUrl, {
-                headers: new HeadersClass(request.headers as any),
+            const clerkRequest = new RequestConstructor(fullUrl, {
+                headers: new HeadersConstructor(request.headers as any),
                 method: request.method || "GET",
             });
 
