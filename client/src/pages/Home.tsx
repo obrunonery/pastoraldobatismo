@@ -149,7 +149,7 @@ export default function Home() {
                         Olá, {user?.firstName || "Membro"} 👋
                     </h1>
                     <p className="text-[12px] font-black uppercase text-slate-300 tracking-[0.2em]">
-                        Gestão da Pastoral de Batismo • Paróquia São João Paulo II
+                        PASTORAL DO BATISMO • Paróquia São João Paulo II
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
