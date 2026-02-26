@@ -7,16 +7,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { createContext: context } = await import("../server/_core/context.js");
 
         // Vercel Request/Response are mostly compatible with Express
-        return createExpressMiddleware({
+        return (createExpressMiddleware({
             router,
             createContext: context,
             onError({ error, path }) {
                 console.error(`[tRPC Error] Path: ${path}`, error);
             },
-        })(req as any, res as any, () => { });
+        }) as any)(req as any, res as any, () => { });
     } catch (err: any) {
         console.error("[TRPC BUNDLE/IMPORT ERROR]", err);
-        res.status(500).json({
+        (res as any).status(500).json({
             error: true,
             message: "Falha ao carregar o roteador do servidor",
             details: err.message,

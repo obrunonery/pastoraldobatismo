@@ -19,20 +19,21 @@ app.use(
         try {
             const { appRouter: router } = await import("../server/routers.js");
             const { createContext: context } = await import("../server/_core/context.js");
-            return createExpressMiddleware({
+            return (createExpressMiddleware({
                 router,
                 createContext: context,
                 onError({ error, path }) {
                     console.error(`[tRPC Error] Path: ${path}`, error);
                 },
-            })(req, res, next);
+            }) as any)(req, res, next);
         } catch (err: any) {
             console.error("[TRPC BUNDLE/IMPORT ERROR]", err);
-            res.status(500).json({
+            (res as any).status(500).json({
                 error: true,
                 message: "Falha ao carregar o roteador do servidor",
                 details: err.message,
-                stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+                stack: err.stack,
+                path: req.path
             });
         }
     }
@@ -52,7 +53,7 @@ app.get("/api/ping", (_req, res) => {
 app.get("/api/minimal-diag", (_req, res) => {
     res.json({
         status: "ok",
-        message: "Express is running",
+        message: "Express está em execução",
         node: process.version,
         time: new Date().toISOString()
     });
@@ -63,7 +64,7 @@ app.get("/api/diag", async (_req, res) => {
     try {
         const { db: database } = await import("../server/db.js");
         // Test basic query
-        const result = await database.execute(sql`SELECT 1 as test`);
+        const result = await (database as any).execute(sql`SELECT 1 as test`);
         res.json({
             status: "ok",
             database: "connected",
@@ -77,7 +78,7 @@ app.get("/api/diag", async (_req, res) => {
         });
     } catch (err: any) {
         console.error("[DIAG ERROR]", err);
-        res.status(500).json({
+        (res as any).status(500).json({
             status: "error",
             message: err.message,
             stack: err.stack,
@@ -97,7 +98,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     console.error(err);
 
     const status = err.statusCode || err.status || 500;
-    res.status(status).json({
+    (res as any).status(status).json({
         error: true,
         message: err.message || "Internal Server Error",
         code: err.code || "INTERNAL_ERROR",

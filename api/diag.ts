@@ -5,7 +5,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const { db: database } = await import("../server/db.js");
         // Test basic query
-        const result = await database.execute(sql`SELECT 1 as test`);
+        const result = await (database as any).execute(sql`SELECT 1 as test`);
         res.status(200).json({
             status: "ok",
             database: "connected",
