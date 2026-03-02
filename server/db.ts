@@ -446,6 +446,11 @@ export async function deleteCommunication(id: number) {
 }
 
 // === Dashboard & BI Queries ===
+const toDateStr = (v: unknown): string => {
+    if (!v || typeof v !== 'string' || v.trim() === '') return '';
+    return v.split('T')[0];
+};
+
 export async function getDashboardSummary() {
     const nowLocal = new Date(new Date().getTime() - (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
@@ -474,13 +479,13 @@ export async function getDashboardSummary() {
             nextBaptism: nextBap ? {
                 id: nextBap.id,
                 childName: nextBap.childName || "Sem Nome",
-                date: (nextBap.scheduledDate || nextBap.date || "").split('T')[0],
+                date: toDateStr(nextBap.scheduledDate) || toDateStr(nextBap.date),
                 docsOk: nextBap.docsOk
             } : null,
             nextMeeting: nextMeet ? {
                 id: nextMeet.id,
                 title: nextMeet.title || "Reunião Pastoral",
-                meetingDate: (nextMeet.meetingDate || "").split('T')[0],
+                meetingDate: toDateStr(nextMeet.meetingDate),
                 location: nextMeet.location,
                 meetingTime: nextMeet.meetingTime,
                 type: nextMeet.type
@@ -488,7 +493,7 @@ export async function getDashboardSummary() {
             nextEvent: nextEve ? {
                 id: nextEve.id,
                 title: nextEve.title,
-                date: (nextEve.date || "").split('T')[0],
+                date: toDateStr(nextEve.date),
                 location: nextEve.location
             } : null,
             notificationsCount: commCount[0].total
@@ -523,7 +528,7 @@ export async function getPresenceScale() {
                 baptism: {
                     id: baptism.id,
                     childName: baptism.childName || "Sem Nome",
-                    date: (baptism.scheduledDate || baptism.date || "").split('T')[0],
+                    date: toDateStr(baptism.scheduledDate) || toDateStr(baptism.date),
                     docsOk: baptism.docsOk
                 },
                 members: []
@@ -554,7 +559,7 @@ export async function getPresenceScale() {
             baptism: {
                 id: baptism.id,
                 childName: baptism.childName || "Sem Nome",
-                date: (baptism.scheduledDate || baptism.date || "").split('T')[0],
+                date: toDateStr(baptism.scheduledDate) || toDateStr(baptism.date),
                 docsOk: baptism.docsOk
             },
             members: schedulesMap[baptism.id] || []
