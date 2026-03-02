@@ -10,7 +10,7 @@ if (!url) {
 
 const client = createClient({
     url: url || "libsql://missing-url-check-env-vars.invalid",
-    authToken: process.env.TURSO_AUTH_DATABASE,
+    authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
 export const db = drizzle(client, { schema });
@@ -610,7 +610,7 @@ export async function getEvolutionData(filters?: { gender?: string, city?: strin
 
     return result.map((row: any) => {
         const month = monthsMap[row.monthNum] || 'Desconhecido';
-        const year = row.yearNum ? row.yearNum.slice(2) : '??';
+        const year = (row.yearNum && typeof row.yearNum === 'string') ? row.yearNum.slice(2) : '??';
         return {
             name: `${month} ${year}`,
             quantity: row.count,
