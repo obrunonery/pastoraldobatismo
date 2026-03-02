@@ -394,7 +394,13 @@ export async function deleteFormation(id: number) {
 
 // === Pedidos / Solicitações ===
 export async function listRequests() {
-    return await db.select().from(schema.requests).orderBy(desc(schema.requests.createdAt));
+    const rows = await db.select().from(schema.requests).orderBy(desc(schema.requests.createdAt));
+    return rows.map(r => ({
+        ...r,
+        createdAt: (r.createdAt && typeof r.createdAt === 'string' && r.createdAt.trim() !== '')
+            ? r.createdAt
+            : null,
+    }));
 }
 
 export async function createRequest(data: any) {
