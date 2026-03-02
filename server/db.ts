@@ -157,9 +157,9 @@ export async function listAllAgendaItems() {
         facilitator: f.facilitator || f.facilitator // Ensuring it's passed
     }));
 
-    return [...mappedEvents, ...mappedMeetings, ...mappedBaptisms, ...mappedFormations].sort((a, b) =>
-        (a.date || "").localeCompare(b.date || "")
-    );
+    return [...mappedEvents, ...mappedMeetings, ...mappedBaptisms, ...mappedFormations]
+        .filter(e => e.date && typeof e.date === 'string' && e.date.trim() !== '')
+        .sort((a, b) => a.date!.localeCompare(b.date!));
 }
 
 export async function deleteGeneralEvent(id: number) {

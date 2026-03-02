@@ -54,14 +54,14 @@ export default function AgendaPage() {
 
     const filteredEvents = date
         ? events.filter((e: any) => {
-            if (!e.date) return false;
+            if (!e.date || typeof e.date !== 'string' || e.date.trim() === '') return false;
             const eventDate = parseISO(e.date);
             return isSameDay(eventDate, date);
         })
         : [];
 
     const monthEvents = events.filter((e: any) => {
-        if (!e.date) return false;
+        if (!e.date || typeof e.date !== 'string' || e.date.trim() === '') return false;
         const eventDate = parseISO(e.date);
         const sameMonth = isSameMonth(eventDate, currentMonth);
         const afterOrToday = eventDate >= startOfDay(new Date());
@@ -69,7 +69,7 @@ export default function AgendaPage() {
     });
 
     const eventDates = events
-        .filter((e: any) => e.date)
+        .filter((e: any) => e.date && typeof e.date === 'string' && e.date.trim() !== '')
         .map((e: any) => parseISO(e.date));
 
     const isShowingDay = !!date;
