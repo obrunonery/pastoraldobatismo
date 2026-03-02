@@ -19,7 +19,9 @@ export async function createContext(
     try {
         const { sdk } = await import("./sdk.js");
         user = await sdk.authenticateRequest(opts.req);
-    } catch (error) {
+    } catch (error: any) {
+        console.error('[CONTEXT ERROR] sdk.authenticateRequest failed:', error?.name, error?.message);
+        console.error('[CONTEXT ERROR] Stack:', error?.stack);
         user = null;
     }
 

@@ -8,12 +8,21 @@ if (!url) {
     console.error("[DB] CRITICAL ERROR: TURSO_URL is not defined! The application will crash on first query.");
 }
 
-const client = createClient({
-    url: url || "libsql://missing-url-check-env-vars.invalid",
-    authToken: process.env.TURSO_AUTH_TOKEN,
-});
+let _client: ReturnType<typeof createClient>;
+try {
+    _client = createClient({
+        url: url || "libsql://missing-url-check-env-vars.invalid",
+        authToken: process.env.TURSO_AUTH_TOKEN,
+    });
+    console.log("[DB] createClient initialized OK. URL prefix:", (url || "").substring(0, 20));
+} catch (initErr: any) {
+    console.error("[DB] FATAL: createClient failed:", initErr?.message);
+    console.error("[DB] FATAL Stack:", initErr?.stack);
+    throw initErr;
+}
 
-export const db = drizzle(client, { schema });
+export const db = drizzle(_client!, { schema });
+console.log("[DB] drizzle initialized OK");
 
 // === Usuários / Perfil ===
 export async function upsertUser(user: any) {
