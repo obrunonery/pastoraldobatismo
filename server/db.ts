@@ -213,8 +213,8 @@ export async function listBaptisms() {
         parentNames: row.parentNames,
         godparentsNames: row.godparentsNames,
         status: row.status,
-        date: row.date,
-        scheduledDate: row.scheduledDate,
+        date: (row.date && typeof row.date === 'string' && row.date.trim() !== '') ? row.date : null,
+        scheduledDate: (row.scheduledDate && typeof row.scheduledDate === 'string' && row.scheduledDate.trim() !== '') ? row.scheduledDate : null,
         celebrantId: row.celebrantId,
         courseDone: row.courseDone,
         docsOk: row.docsOk,
@@ -294,7 +294,7 @@ export async function getFinanceBI() {
 
 // === Atas de Reunião (Minutes) ===
 export async function listMeetings() {
-    return await db.select({
+    const rows = await db.select({
         id: schema.minutes.id,
         title: schema.minutes.title,
         type: schema.minutes.type,
@@ -309,6 +309,11 @@ export async function listMeetings() {
         .from(schema.minutes)
         .leftJoin(schema.users, eq(schema.minutes.responsibleId, schema.users.id))
         .orderBy(desc(schema.minutes.meetingDate));
+    return rows.map(r => ({
+        ...r,
+        meetingDate: (r.meetingDate && typeof r.meetingDate === 'string' && r.meetingDate.trim() !== '') ? r.meetingDate : null,
+        meetingTime: (r.meetingTime && typeof r.meetingTime === 'string' && r.meetingTime.trim() !== '') ? r.meetingTime : null,
+    }));
 }
 
 export async function createMeeting(data: any) {
@@ -376,7 +381,11 @@ export async function deleteUpload(id: number) {
 
 // === Formações ===
 export async function listFormations() {
-    return await db.select().from(schema.formations).orderBy(desc(schema.formations.date));
+    const rows = await db.select().from(schema.formations).orderBy(desc(schema.formations.date));
+    return rows.map(r => ({
+        ...r,
+        date: (r.date && typeof r.date === 'string' && r.date.trim() !== '') ? r.date : null,
+    }));
 }
 
 export async function createFormation(data: any) {

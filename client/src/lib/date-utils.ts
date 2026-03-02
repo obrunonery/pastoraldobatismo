@@ -7,6 +7,7 @@ import { ptBR } from "date-fns/locale";
  */
 export function formatDate(date: string | Date | null | undefined, formatStr: string = "dd/MM/yyyy"): string {
     if (!date) return "-";
+    if (typeof date === "string" && date.trim() === "") return "-";
 
     const d = typeof date === "string" ? parseISO(date) : date;
 
@@ -27,6 +28,7 @@ export function formatMonthYear(date: Date): string {
  */
 export function toInputDate(date: string | Date | null | undefined): string {
     if (!date) return "";
+    if (typeof date === "string" && date.trim() === "") return "";
     const d = typeof date === "string" ? parseISO(date) : date;
     if (!isValid(d)) return "";
     return format(d, "yyyy-MM-dd");
@@ -37,6 +39,7 @@ export function toInputDate(date: string | Date | null | undefined): string {
  */
 export function getSmartBadge(dateStr: string | Date | null | undefined, status?: string) {
     if (!dateStr) return null;
+    if (typeof dateStr === "string" && dateStr.trim() === "") return null;
     const d = typeof dateStr === "string" ? parseISO(dateStr) : dateStr;
     if (!isValid(d)) return null;
 
