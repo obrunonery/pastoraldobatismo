@@ -7,8 +7,9 @@ const t = initTRPC.context<TrpcContext>().create({
     transformer: superjson,
     errorFormatter({ shape, error, ctx, path, type }) {
         if (error.code === 'INTERNAL_SERVER_ERROR') {
-            console.error(`[tRPC INTERNAL ERROR] Path: ${path}, Type: ${type}`);
-            console.error(error); // Logs full stack trace in production
+            const cause = error.cause as any;
+            const stack = (cause?.stack || error.stack || '').split('\n').slice(0, 5).join(' | ');
+            console.error(`[tRPC INTERNAL ERROR] ${JSON.stringify({ path, type, message: error.message, causeMsg: cause?.message, stack })}`);
         }
         return shape;
     },

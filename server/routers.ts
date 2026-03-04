@@ -34,13 +34,18 @@ export const appRouter = router({
         getProfile: publicProcedure
             .input(z.object({ id: z.string() }))
             .query(async ({ input }) => {
-                const user = await db.getUserByClerkId(input.id);
-                if (user) {
-                    console.log("[TRPC] Profile found for:", input.id, "(role:", user.role, ")");
-                } else {
-                    console.log("[TRPC] Profile not found in DB for:", input.id);
+                try {
+                    const user = await db.getUserByClerkId(input.id);
+                    if (user) {
+                        console.log("[TRPC] Profile found for:", input.id, "(role:", user.role, ")");
+                    } else {
+                        console.log("[TRPC] Profile not found in DB for:", input.id);
+                    }
+                    return user;
+                } catch (err) {
+                    console.error('[ROUTER ERROR] auth.getProfile', err);
+                    throw err;
                 }
-                return user;
             }),
     }),
 
@@ -120,7 +125,12 @@ export const appRouter = router({
     // Batismo Router
     baptism: router({
         list: protectedProcedure.query(async () => {
-            return await db.listBaptisms();
+            try {
+                return await db.listBaptisms();
+            } catch (err) {
+                console.error('[ROUTER ERROR] baptism.list', err);
+                throw err;
+            }
         }),
         create: protectedProcedure
             .input(z.object({
@@ -330,10 +340,20 @@ export const appRouter = router({
     // Dashboard Router
     dashboard: router({
         getSummary: protectedProcedure.query(async () => {
-            return await db.getDashboardSummary();
+            try {
+                return await db.getDashboardSummary();
+            } catch (err) {
+                console.error('[ROUTER ERROR] dashboard.getSummary', err);
+                throw err;
+            }
         }),
         getPresenceScale: protectedProcedure.query(async () => {
-            return await db.getPresenceScale();
+            try {
+                return await db.getPresenceScale();
+            } catch (err) {
+                console.error('[ROUTER ERROR] dashboard.getPresenceScale', err);
+                throw err;
+            }
         }),
         updatePresenceStatus: protectedProcedure
             .input(z.object({
@@ -367,10 +387,20 @@ export const appRouter = router({
                 ageGroup: z.string().optional()
             }).optional())
             .query(async ({ input }) => {
-                return await db.getEvolutionData(input);
+                try {
+                    return await db.getEvolutionData(input);
+                } catch (err) {
+                    console.error('[ROUTER ERROR] dashboard.getEvolutionData', err);
+                    throw err;
+                }
             }),
         getFinanceBI: protectedProcedure.query(async () => {
-            return await db.getFinanceBI();
+            try {
+                return await db.getFinanceBI();
+            } catch (err) {
+                console.error('[ROUTER ERROR] dashboard.getFinanceBI', err);
+                throw err;
+            }
         }),
         getAnnualGoal: protectedProcedure
             .query(async () => {
@@ -384,7 +414,12 @@ export const appRouter = router({
             }),
         getUniqueCities: protectedProcedure
             .query(async () => {
-                return await db.listUniqueCities();
+                try {
+                    return await db.listUniqueCities();
+                } catch (err) {
+                    console.error('[ROUTER ERROR] dashboard.getUniqueCities', err);
+                    throw err;
+                }
             }),
     }),
 

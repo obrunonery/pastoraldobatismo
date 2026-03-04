@@ -83,7 +83,7 @@ export default function Home() {
         ageGroup: undefined
     });
     const { data: evolutionData } = trpc.dashboard.getEvolutionData.useQuery(filters);
-    const { data: financeBI } = trpc.dashboard.getFinanceBI.useQuery();
+    const { data: financeBI = [] } = trpc.dashboard.getFinanceBI.useQuery();
     const { data: uniqueCities } = trpc.dashboard.getUniqueCities.useQuery();
 
     // Alert: Baptisms without assigned members
@@ -502,7 +502,7 @@ export default function Home() {
                             <div className="lg:col-span-4 bg-white rounded-[40px] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.02)] border border-slate-50">
                                 <h3 className="text-lg font-black text-slate-800 mb-6">Resumo Mensal</h3>
                                 <div className="space-y-4">
-                                    {financeBI?.slice(-4).reverse().map((item: any) => (
+                                    {(Array.isArray(financeBI) ? financeBI.slice(-4).reverse() : []).map((item: any) => (
                                         <div key={item.month} className="p-4 rounded-3xl bg-stats-cyan/5 border border-transparent hover:border-slate-100 transition-all">
                                             <div className="flex justify-between items-center mb-2">
                                                 <span className="text-xs font-black text-slate-900">{formatFinanceMonth(item.month)}</span>

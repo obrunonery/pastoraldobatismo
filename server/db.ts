@@ -8,12 +8,21 @@ if (!url) {
     console.error("[DB] CRITICAL ERROR: TURSO_URL is not defined! The application will crash on first query.");
 }
 
-const client = createClient({
-    url: url || "libsql://missing-url-check-env-vars.invalid",
-    authToken: process.env.TURSO_AUTH_DATABASE,
-});
+let _client: ReturnType<typeof createClient>;
+try {
+    _client = createClient({
+        url: url || "libsql://missing-url-check-env-vars.invalid",
+        authToken: process.env.TURSO_AUTH_TOKEN,
+    });
+    console.log("[DB] createClient initialized OK. URL prefix:", (url || "").substring(0, 20));
+} catch (initErr: any) {
+    console.error("[DB] FATAL: createClient failed:", initErr?.message);
+    console.error("[DB] FATAL Stack:", initErr?.stack);
+    throw initErr;
+}
 
-export const db = drizzle(client, { schema });
+export const db = drizzle(_client!, { schema });
+console.log("[DB] drizzle initialized OK");
 
 // === Usuários / Perfil ===
 export async function upsertUser(user: any) {
@@ -157,9 +166,9 @@ export async function listAllAgendaItems() {
         facilitator: f.facilitator || f.facilitator // Ensuring it's passed
     }));
 
-    return [...mappedEvents, ...mappedMeetings, ...mappedBaptisms, ...mappedFormations].sort((a, b) =>
-        (a.date || "").localeCompare(b.date || "")
-    );
+    return [...mappedEvents, ...mappedMeetings, ...mappedBaptisms, ...mappedFormations]
+        .filter(e => e.date && typeof e.date === 'string' && e.date.trim() !== '')
+        .sort((a, b) => a.date!.localeCompare(b.date!));
 }
 
 export async function deleteGeneralEvent(id: number) {
@@ -213,8 +222,8 @@ export async function listBaptisms() {
         parentNames: row.parentNames,
         godparentsNames: row.godparentsNames,
         status: row.status,
-        date: row.date,
-        scheduledDate: row.scheduledDate,
+        date: (row.date && typeof row.date === 'string' && row.date.trim() !== '') ? row.date : null,
+        scheduledDate: (row.scheduledDate && typeof row.scheduledDate === 'string' && row.scheduledDate.trim() !== '') ? row.scheduledDate : null,
         celebrantId: row.celebrantId,
         courseDone: row.courseDone,
         docsOk: row.docsOk,
@@ -294,7 +303,7 @@ export async function getFinanceBI() {
 
 // === Atas de Reunião (Minutes) ===
 export async function listMeetings() {
-    return await db.select({
+    const rows = await db.select({
         id: schema.minutes.id,
         title: schema.minutes.title,
         type: schema.minutes.type,
@@ -309,6 +318,11 @@ export async function listMeetings() {
         .from(schema.minutes)
         .leftJoin(schema.users, eq(schema.minutes.responsibleId, schema.users.id))
         .orderBy(desc(schema.minutes.meetingDate));
+    return rows.map(r => ({
+        ...r,
+        meetingDate: (r.meetingDate && typeof r.meetingDate === 'string' && r.meetingDate.trim() !== '') ? r.meetingDate : null,
+        meetingTime: (r.meetingTime && typeof r.meetingTime === 'string' && r.meetingTime.trim() !== '') ? r.meetingTime : null,
+    }));
 }
 
 export async function createMeeting(data: any) {
@@ -376,7 +390,11 @@ export async function deleteUpload(id: number) {
 
 // === Formações ===
 export async function listFormations() {
-    return await db.select().from(schema.formations).orderBy(desc(schema.formations.date));
+    const rows = await db.select().from(schema.formations).orderBy(desc(schema.formations.date));
+    return rows.map(r => ({
+        ...r,
+        date: (r.date && typeof r.date === 'string' && r.date.trim() !== '') ? r.date : null,
+    }));
 }
 
 export async function createFormation(data: any) {
@@ -394,7 +412,13 @@ export async function deleteFormation(id: number) {
 
 // === Pedidos / Solicitações ===
 export async function listRequests() {
-    return await db.select().from(schema.requests).orderBy(desc(schema.requests.createdAt));
+    const rows = await db.select().from(schema.requests).orderBy(desc(schema.requests.createdAt));
+    return rows.map(r => ({
+        ...r,
+        createdAt: (r.createdAt && typeof r.createdAt === 'string' && r.createdAt.trim() !== '')
+            ? r.createdAt
+            : null,
+    }));
 }
 
 export async function createRequest(data: any) {
@@ -431,6 +455,11 @@ export async function deleteCommunication(id: number) {
 }
 
 // === Dashboard & BI Queries ===
+const toDateStr = (v: unknown): string => {
+    if (!v || typeof v !== 'string' || v.trim() === '') return '';
+    return v.split('T')[0];
+};
+
 export async function getDashboardSummary() {
     const nowLocal = new Date(new Date().getTime() - (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
@@ -459,13 +488,13 @@ export async function getDashboardSummary() {
             nextBaptism: nextBap ? {
                 id: nextBap.id,
                 childName: nextBap.childName || "Sem Nome",
-                date: (nextBap.scheduledDate || nextBap.date || "").split('T')[0],
+                date: toDateStr(nextBap.scheduledDate) || toDateStr(nextBap.date),
                 docsOk: nextBap.docsOk
             } : null,
             nextMeeting: nextMeet ? {
                 id: nextMeet.id,
                 title: nextMeet.title || "Reunião Pastoral",
-                meetingDate: (nextMeet.meetingDate || "").split('T')[0],
+                meetingDate: toDateStr(nextMeet.meetingDate),
                 location: nextMeet.location,
                 meetingTime: nextMeet.meetingTime,
                 type: nextMeet.type
@@ -473,7 +502,7 @@ export async function getDashboardSummary() {
             nextEvent: nextEve ? {
                 id: nextEve.id,
                 title: nextEve.title,
-                date: (nextEve.date || "").split('T')[0],
+                date: toDateStr(nextEve.date),
                 location: nextEve.location
             } : null,
             notificationsCount: commCount[0].total
@@ -508,7 +537,7 @@ export async function getPresenceScale() {
                 baptism: {
                     id: baptism.id,
                     childName: baptism.childName || "Sem Nome",
-                    date: (baptism.scheduledDate || baptism.date || "").split('T')[0],
+                    date: toDateStr(baptism.scheduledDate) || toDateStr(baptism.date),
                     docsOk: baptism.docsOk
                 },
                 members: []
@@ -539,7 +568,7 @@ export async function getPresenceScale() {
             baptism: {
                 id: baptism.id,
                 childName: baptism.childName || "Sem Nome",
-                date: (baptism.scheduledDate || baptism.date || "").split('T')[0],
+                date: toDateStr(baptism.scheduledDate) || toDateStr(baptism.date),
                 docsOk: baptism.docsOk
             },
             members: schedulesMap[baptism.id] || []
@@ -610,7 +639,7 @@ export async function getEvolutionData(filters?: { gender?: string, city?: strin
 
     return result.map((row: any) => {
         const month = monthsMap[row.monthNum] || 'Desconhecido';
-        const year = row.yearNum ? row.yearNum.slice(2) : '??';
+        const year = (row.yearNum && typeof row.yearNum === 'string') ? row.yearNum.slice(2) : '??';
         return {
             name: `${month} ${year}`,
             quantity: row.count,
