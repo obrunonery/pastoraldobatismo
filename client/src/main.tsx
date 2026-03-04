@@ -29,7 +29,8 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
     if (!isUnauthorized) return;
 
-    window.location.href = getLoginUrl();
+    // window.location.href = getLoginUrl(); // TEMPORARILY DISABLED FOR DEBUGGING
+    console.error(`[DEBUG] Redirect prevented! Auth Error:`, error.message, error.data);
 };
 
 queryClient.getQueryCache().subscribe(event => {
