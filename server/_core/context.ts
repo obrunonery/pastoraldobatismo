@@ -6,7 +6,7 @@ import * as schema from "../../drizzle/schema.js";
 type User = typeof schema.users.$inferSelect;
 
 export type TrpcContext = {
-    req: Request;
+    req: Request & { authError?: any };
     res: Response;
     user: User | null;
 };
@@ -22,6 +22,8 @@ export async function createContext(
     } catch (error: any) {
         console.error('[CONTEXT ERROR] sdk.authenticateRequest failed:', error?.name, error?.message);
         console.error('[CONTEXT ERROR] Stack:', error?.stack);
+        // Retain the error in context to throw a more specific message in TRPC middleware
+        opts.req.authError = error;
         user = null;
     }
 

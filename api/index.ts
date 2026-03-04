@@ -63,6 +63,22 @@ app.get("/api/minimal-diag", (_req, res) => {
 });
 
 // Diagnostic Endpoint
+app.get("/api/auth-diag", async (req: express.Request, res: express.Response) => {
+    try {
+        const { sdk } = await import("../server/_core/sdk.js");
+        const user = await sdk.authenticateRequest(req);
+        res.json({ status: "ok", user });
+    } catch (err: any) {
+        res.status(401).json({
+            status: "error",
+            message: err.message,
+            stack: err.stack,
+            headers: req.headers
+        });
+    }
+});
+
+// Diagnostic Endpoint
 app.get("/api/diag", async (_req: express.Request, res: express.Response) => {
     try {
         const { db: database } = await import("../server/db.js");

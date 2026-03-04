@@ -22,7 +22,8 @@ const requireUser = t.middleware(async opts => {
     const { ctx, next } = opts;
 
     if (!ctx.user) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+        const authErrorMsg = ctx.req.authError ? `AuthError: ${ctx.req.authError.message}` : UNAUTHED_ERR_MSG;
+        throw new TRPCError({ code: "UNAUTHORIZED", message: authErrorMsg });
     }
 
     return next({
