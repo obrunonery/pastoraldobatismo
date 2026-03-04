@@ -107,8 +107,24 @@ app.get("/api/diag", async (_req: express.Request, res: express.Response) => {
 });
 
 // Health check
-app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", env: process.env.NODE_ENV });
+app.get("/api/health", async (_req, res) => {
+    try {
+        const { db: database } = await import("../server/db.js");
+        await database.run(sql`SELECT 1`);
+        res.json({
+            status: "ok",
+            database: "connected",
+            timestamp: new Date().toISOString()
+        });
+    } catch (err: any) {
+        console.error("[HEALTH CHECK ERROR]", err);
+        res.status(500).json({
+            status: "error",
+            database: "disconnected",
+            message: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Global Error Handler (CRITICAL for Vercel JSON responses)
